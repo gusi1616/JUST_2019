@@ -35,7 +35,7 @@ static void init_chip_pins(void)
 	__HAL_RCC_GPIOC_CLK_ENABLE();
 
 	/*Configure GPIO pin Output Level */
-	HAL_GPIO_WritePin(WINC_GPIO_Port, WINC_CFG_Pin|WINC_EN_Pin|WINC_WAKE_Pin, GPIO_PIN_RESET);
+	HAL_GPIO_WritePin(WINC_GPIO_Port, WINC_EN_Pin, GPIO_PIN_RESET);
 
 	/*Configure GPIO pin Output Level */
 	HAL_GPIO_WritePin(WINC_GPIO_Port, WINC_CS_Pin|WINC_RST_Pin, GPIO_PIN_SET);
@@ -48,8 +48,7 @@ static void init_chip_pins(void)
 
 	/*Configure GPIO pins : WINC_CFG_Pin WINC_EN_Pin WINC_RST_Pin WINC_CS_Pin
 	                           WINC_WAKE_Pin */
-	GPIO_InitStruct.Pin = WINC_CFG_Pin|WINC_EN_Pin|WINC_RST_Pin|WINC_CS_Pin
-			|WINC_WAKE_Pin;
+	GPIO_InitStruct.Pin = WINC_EN_Pin|WINC_RST_Pin|WINC_CS_Pin;
 	GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
 	GPIO_InitStruct.Pull = GPIO_NOPULL;
 	GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
@@ -58,7 +57,7 @@ static void init_chip_pins(void)
 
 static void deinit_chip_pins(void)
 {
-	HAL_GPIO_DeInit(GPIOA, WINC_CFG_Pin|WINC_EN_Pin|WINC_RST_Pin|WINC_WAKE_Pin|WINC_CS_Pin);
+	HAL_GPIO_DeInit(WINC_GPIO_Port, WINC_EN_Pin|WINC_RST_Pin|WINC_CS_Pin);
 }
 
 /*
@@ -70,7 +69,7 @@ sint8 nm_bsp_init(void)
 {
 	gpfIsr = NULL;
 
-	init_chip_pins();
+	//init_chip_pins();
 
 	nm_bsp_reset();
 
