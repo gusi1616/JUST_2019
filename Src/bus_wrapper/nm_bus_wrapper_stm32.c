@@ -55,7 +55,7 @@
 #include "bsp/nm_bsp_stm32.h"
 #include "common/nm_common.h"
 #include "bus_wrapper/nm_bus_wrapper.h"
-#include "stm32f4xx_hal.h"
+#include "stm32l4xx_hal.h"
 
 
 #define NM_BUS_MAX_TRX_SZ	256
@@ -86,7 +86,7 @@ static sint8 spi_rw(uint8* pu8Mosi, uint8* pu8Miso, uint16 u16Sz)
 		return M2M_ERR_BUS_FAIL;
 	}
 
-	HAL_GPIO_WritePin(WINC_CS_GPIO_Port, WINC_CS_Pin, GPIO_PIN_RESET);
+	HAL_GPIO_WritePin(WINC_GPIO_Port, WINC_CS_Pin, GPIO_PIN_RESET);
 	while (u16Sz) {
 		txd_data = *pu8Mosi;
 		HAL_SPI_TransmitReceive(&hspi_winc,&txd_data,&rxd_data,1,1000);
@@ -97,7 +97,7 @@ static sint8 spi_rw(uint8* pu8Mosi, uint8* pu8Miso, uint16 u16Sz)
 		if (!u8SkipMosi)
 			pu8Mosi++;
 	}
-	HAL_GPIO_WritePin(WINC_CS_GPIO_Port, WINC_CS_Pin, GPIO_PIN_SET);
+	HAL_GPIO_WritePin(WINC_GPIO_Port, WINC_CS_Pin, GPIO_PIN_SET);
 
 	return M2M_SUCCESS;
 }

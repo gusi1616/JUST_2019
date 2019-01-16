@@ -62,17 +62,6 @@
 
 #define DEMCR           (*((volatile unsigned long *)(0xE000EDFC)))
 #define TRCENA          0x01000000
-struct __FILE { int handle; /* Add whatever needed */ };
-FILE __stdout;
-FILE __stdin;
-
-int fputc(int ch, FILE *f) {
-	if (DEMCR & TRCENA) {
-		while (ITM_Port32(0) == 0);
-		ITM_Port8(0) = ch;
-	}
-	return(ch);
-}
 
 /** Security mode Supported */
 #define USE_WPAPSK 1 /* WPA/WPA2 PSK Security Mode*/

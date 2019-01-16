@@ -55,7 +55,7 @@
 #define NM_BSP_PRINTF
 
 #define CONF_WINC_USE_SPI	1
-#define hspi_winc hspi1
+#define hspi_winc hspi2
 
 #define NM_EDGE_INTERRUPT	1
 

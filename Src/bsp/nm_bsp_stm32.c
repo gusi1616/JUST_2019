@@ -10,7 +10,7 @@
 #include <bsp/nm_bsp_stm32.h>
 #include "bsp/nm_bsp.h"
 #include "common/nm_common.h"
-#include "stm32f4xx_hal.h"
+#include "stm32l4xx_hal.h"
 
 static tpfNmBspIsr gpfIsr;
 
@@ -44,7 +44,7 @@ static void init_chip_pins(void)
 	GPIO_InitStruct.Pin = WINC_IRQ_Pin;
 	GPIO_InitStruct.Mode = GPIO_MODE_EVT_RISING;
 	GPIO_InitStruct.Pull = GPIO_NOPULL;
-	HAL_GPIO_Init(WINC_IRQ_GPIO_Port, &GPIO_InitStruct);
+	HAL_GPIO_Init(WINC_GPIO_Port, &GPIO_InitStruct);
 
 	/*Configure GPIO pins : WINC_CFG_Pin WINC_EN_Pin WINC_RST_Pin WINC_CS_Pin
 	                           WINC_WAKE_Pin */
@@ -96,9 +96,9 @@ sint8 nm_bsp_deinit(void)
  */
 void nm_bsp_reset(void)
 {
-	HAL_GPIO_WritePin(WINC_RST_GPIO_Port, WINC_RST_Pin, GPIO_PIN_RESET);
+	HAL_GPIO_WritePin(WINC_GPIO_Port, WINC_RST_Pin, GPIO_PIN_RESET);
 	nm_bsp_sleep(100);
-	HAL_GPIO_WritePin(WINC_RST_GPIO_Port, WINC_RST_Pin, GPIO_PIN_SET);
+	HAL_GPIO_WritePin(WINC_GPIO_Port, WINC_RST_Pin, GPIO_PIN_SET);
 	nm_bsp_sleep(100);
 }
 

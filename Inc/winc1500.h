@@ -15,7 +15,7 @@
 #define WIFI_FIRMWARE_REQUIRED WIFI_FIRMWARE_LATEST_MODEL_B
 
 #include "driver/m2m_wifi.h"
-#include "stm32f4xx_hal.h"
+#include "stm32l4xx_hal.h"
 
 /*
 #include "WiFiClient.h"
