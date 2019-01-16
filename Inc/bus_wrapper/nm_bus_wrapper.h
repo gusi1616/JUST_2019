@@ -47,7 +47,7 @@
 /**
     SPI Number
  **/
-#define SPI_WINC SPI1
+#define SPI_WINC SPI2
 /**
 	BUS Type
 **/

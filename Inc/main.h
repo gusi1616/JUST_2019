@@ -102,7 +102,7 @@ void Error_Handler(void);
 #define SWO_Pin GPIO_PIN_3
 #define SWO_GPIO_Port GPIOB
 /* USER CODE BEGIN Private defines */
-#define WINC_GPIO_Port GPIOA
+#define WINC_GPIO_Port GPIOC
 
 typedef struct{
 	uint8_t f_1ms:1;
