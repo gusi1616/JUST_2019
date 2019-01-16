@@ -42,14 +42,17 @@
 #ifndef _NM_BSP_STM32_H_
 #define _NM_BSP_STM32_H_
 
-#define WINC_GPIO_Port GPIOA
+#define WINC_GPIO_Port GPIOC
 
-#define WINC_IRQ_Pin GPIO_PIN_0
-#define WINC_CFG_Pin GPIO_PIN_1
-#define WINC_EN_Pin GPIO_PIN_2
-#define WINC_RST_Pin GPIO_PIN_3
-#define WINC_CS_Pin GPIO_PIN_4
-#define WINC_WAKE_Pin GPIO_PIN_10
+#define WINC_CS_Pin GPIO_PIN_6
+#define WINC_CS_GPIO_Port GPIOC
+#define WINC_EN_Pin GPIO_PIN_7
+#define WINC_EN_GPIO_Port GPIOC
+#define WINC_RST_Pin GPIO_PIN_8
+#define WINC_RST_GPIO_Port GPIOC
+#define WINC_IRQ_Pin GPIO_PIN_9
+#define WINC_IRQ_GPIO_Port GPIOC
+#define WINC_IRQ_EXTI_IRQn EXTI9_5_IRQn
 
 #define NM_DEBUG			0
 #define NM_BSP_PRINTF
