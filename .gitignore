@@ -34,3 +34,4 @@
 *.map
 *.list
 /Debug/
+*.launch
