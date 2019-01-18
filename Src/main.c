@@ -315,27 +315,36 @@ int main(void)
 	}*/
 
 	tstrWifiInitParam param;
-		int8_t ret;
+	int8_t ret;
 
-		// Initialize the WiFi BSP:
-		nm_bsp_init();
+	// Initialize the WiFi BSP:
+	nm_bsp_init();
 
-		// Initialize WiFi module and register status callback:
-		m2m_memset((uint8*)&param, 0, sizeof(param));
-		param.pfAppWifiCb = wifi_cb;
+	// Initialize WiFi module and register status callback:
+	m2m_memset((uint8*)&param, 0, sizeof(param));
+	param.pfAppWifiCb = wifi_cb;
 
 
-		ret = m2m_wifi_init(&param);
-		if (M2M_SUCCESS != ret && M2M_ERR_FW_VER_MISMATCH != ret) {
-			M2M_ERR("Driver Init Failed <%d>\n",ret);
-		}
-
-	// Start Connect
-	if (wincStartConnect("SimonsWifi", M2M_WIFI_SEC_OPEN, NULL, 6) != M2M_SUCCESS)
-	{
-		result = M2M_ERR_JOIN_FAIL;
+	ret = m2m_wifi_init(&param);
+	if (M2M_SUCCESS != ret && M2M_ERR_FW_VER_MISMATCH != ret) {
+		M2M_ERR("Driver Init Failed <%d>\n",ret);
 	}
 
+	// Start Connect
+	tstrM2MAPConfig apConfig;
+	strcpy(apConfig.au8SSID, "SimonsWIFI");
+	apConfig.u8SsidHide = SSID_MODE_VISIBLE;
+	apConfig.u8ListenChannel = 6;
+
+	apConfig.u8SecType = M2M_WIFI_SEC_OPEN;
+
+	//IP Address
+	apConfig.au8DHCPServerIP[0] = 192;
+	apConfig.au8DHCPServerIP[1] = 168;
+	apConfig.au8DHCPServerIP[2] = 1;
+	apConfig.au8DHCPServerIP[3] = 1;
+
+	m2m_wifi_enable_ap(&apConfig);
 
 
   /* USER CODE END 2 */
