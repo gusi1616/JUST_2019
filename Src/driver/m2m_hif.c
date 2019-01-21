@@ -85,7 +85,7 @@ typedef struct {
 
 volatile tstrHifContext gstrHifCxt;
 
-static void isr(void)
+void isr(void)
 {
 	gstrHifCxt.u8Interrupt++;
 #ifdef NM_LEVEL_INTERRUPT

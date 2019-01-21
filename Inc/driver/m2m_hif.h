@@ -44,7 +44,7 @@
 
 /*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*
 INCLUDES
-*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*/
+ *=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*/
 
 #include "common/nm_common.h"
 /*!< Include depends on UNO Board is used or not*/
@@ -54,29 +54,30 @@ INCLUDES
 
 /*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*
 MACROS
-*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*/
+ *=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*/
 
 #define M2M_HIF_MAX_PACKET_SIZE      (1600 - 4)
 /*!< Maximum size of the buffer could be transferred between Host and Firmware.
-*/
+ */
 
 #define M2M_HIF_HDR_OFFSET (sizeof(tstrHifHdr) + 4)
 
 /**
-*	@struct		tstrHifHdr
-*	@brief		Structure to hold HIF header
-*/
+ *	@struct		tstrHifHdr
+ *	@brief		Structure to hold HIF header
+ */
 typedef struct
 {
-    uint8   u8Gid;		/*!< Group ID */
-    uint8   u8Opcode;	/*!< OP code */
-    uint16  u16Length;	/*!< Payload length */
+	uint8   u8Gid;		/*!< Group ID */
+	uint8   u8Opcode;	/*!< OP code */
+	uint16  u16Length;	/*!< Payload length */
 }tstrHifHdr;
 
 #ifdef __cplusplus
-     extern "C" {
+extern "C" {
 #endif
 
+void isr(void);
 /*!
 @typedef typedef void (*tpfHifCallBack)(uint8 u8OpCode, uint16 u16DataSize, uint32 u32Addr);
 @brief	used to point to Wi-Fi call back function depend on Arduino project or other projects.
@@ -88,104 +89,104 @@ typedef struct
 				HIF address.
 @param [in]	grp
 				HIF group type.
-*/
+ */
 typedef void (*tpfHifCallBack)(uint8 u8OpCode, uint16 u16DataSize, uint32 u32Addr);
 /**
-*   @fn			NMI_API sint8 hif_init(void * arg);
-*   @brief
+ *   @fn			NMI_API sint8 hif_init(void * arg);
+ *   @brief
 				To initialize HIF layer.
-*   @param [in]	arg
-*				Pointer to the arguments.
-*   @return
+ *   @param [in]	arg
+ *				Pointer to the arguments.
+ *   @return
 				The function shall return ZERO for successful operation and a negative value otherwise.
-*/
+ */
 NMI_API sint8 hif_init(void * arg);
 /**
-*	@fn			NMI_API sint8 hif_deinit(void * arg);
-*	@brief
+ *	@fn			NMI_API sint8 hif_deinit(void * arg);
+ *	@brief
 				To Deinitialize HIF layer.
-*   @param [in]	arg
-*				Pointer to the arguments.
-*    @return
+ *   @param [in]	arg
+ *				Pointer to the arguments.
+ *    @return
 				The function shall return ZERO for successful operation and a negative value otherwise.
-*/
+ */
 NMI_API sint8 hif_deinit(void * arg);
 /**
-*	@fn		NMI_API sint8 hif_send(uint8 u8Gid,uint8 u8Opcode,uint8 *pu8CtrlBuf,uint16 u16CtrlBufSize,
+ *	@fn		NMI_API sint8 hif_send(uint8 u8Gid,uint8 u8Opcode,uint8 *pu8CtrlBuf,uint16 u16CtrlBufSize,
 					   uint8 *pu8DataBuf,uint16 u16DataSize, uint16 u16DataOffset)
-*	@brief	Send packet using host interface.
+ *	@brief	Send packet using host interface.
 
-*	@param [in]	u8Gid
-*				Group ID.
-*	@param [in]	u8Opcode
-*				Operation ID.
-*	@param [in]	pu8CtrlBuf
-*				Pointer to the Control buffer.
-*	@param [in]	u16CtrlBufSize
+ *	@param [in]	u8Gid
+ *				Group ID.
+ *	@param [in]	u8Opcode
+ *				Operation ID.
+ *	@param [in]	pu8CtrlBuf
+ *				Pointer to the Control buffer.
+ *	@param [in]	u16CtrlBufSize
 				Control buffer size.
-*	@param [in]	u16DataOffset
+ *	@param [in]	u16DataOffset
 				Packet Data offset.
-*	@param [in]	pu8DataBuf
-*				Packet buffer Allocated by the caller.
-*	@param [in]	u16DataSize
+ *	@param [in]	pu8DataBuf
+ *				Packet buffer Allocated by the caller.
+ *	@param [in]	u16DataSize
 				Packet buffer size (including the HIF header).
-*    @return	The function shall return ZERO for successful operation and a negative value otherwise.
-*/
+ *    @return	The function shall return ZERO for successful operation and a negative value otherwise.
+ */
 NMI_API sint8 hif_send(uint8 u8Gid,uint8 u8Opcode,uint8 *pu8CtrlBuf,uint16 u16CtrlBufSize,
-					   uint8 *pu8DataBuf,uint16 u16DataSize, uint16 u16DataOffset);
+		uint8 *pu8DataBuf,uint16 u16DataSize, uint16 u16DataOffset);
 /*
-*	@fn		hif_receive
-*	@brief	Host interface interrupt serviece routine
-*	@param [in]	u32Addr
-*				Receive start address
-*	@param [out] pu8Buf
-*				Pointer to receive buffer. Allocated by the caller
-*	@param [in]	 u16Sz
-*				Receive buffer size
-*	@param [in]	isDone
-*				If you don't need any more packets send True otherwise send false
-*   @return
+ *	@fn		hif_receive
+ *	@brief	Host interface interrupt serviece routine
+ *	@param [in]	u32Addr
+ *				Receive start address
+ *	@param [out] pu8Buf
+ *				Pointer to receive buffer. Allocated by the caller
+ *	@param [in]	 u16Sz
+ *				Receive buffer size
+ *	@param [in]	isDone
+ *				If you don't need any more packets send True otherwise send false
+ *   @return
 				The function shall return ZERO for successful operation and a negative value otherwise.
-*/
+ */
 
 NMI_API sint8 hif_receive(uint32 u32Addr, uint8 *pu8Buf, uint16 u16Sz, uint8 isDone);
 /**
-*	@fn			hif_register_cb
-*	@brief
+ *	@fn			hif_register_cb
+ *	@brief
 				To set Callback function for every  Component.
 
-*	@param [in]	u8Grp
-*				Group to which the Callback function should be set.
+ *	@param [in]	u8Grp
+ *				Group to which the Callback function should be set.
 
-*	@param [in]	fn
-*				function to be set to the specified group.
-*   @return
+ *	@param [in]	fn
+ *				function to be set to the specified group.
+ *   @return
 				The function shall return ZERO for successful operation and a negative value otherwise.
-*/
+ */
 NMI_API sint8 hif_register_cb(uint8 u8Grp,tpfHifCallBack fn);
 /**
-*	@fn		NMI_API sint8 hif_chip_sleep(void);
-*	@brief
+ *	@fn		NMI_API sint8 hif_chip_sleep(void);
+ *	@brief
 				To make the chip sleep.
-*   @return
+ *   @return
 				The function shall return ZERO for successful operation and a negative value otherwise.
-*/
+ */
 NMI_API sint8 hif_chip_sleep(void);
 /**
-*	@fn		NMI_API sint8 hif_chip_sleep_sc(void);
-*	@brief
+ *	@fn		NMI_API sint8 hif_chip_sleep_sc(void);
+ *	@brief
 				To clear the chip count only but keep the chip awake
-*   @return
+ *   @return
 				The function shall return ZERO for successful operation and a negative value otherwise.
-*/
+ */
 NMI_API sint8 hif_chip_sleep_sc(void);
 /**
-*	@fn		NMI_API sint8 hif_chip_wake(void);
-*	@brief
+ *	@fn		NMI_API sint8 hif_chip_wake(void);
+ *	@brief
 			To Wakeup the chip.
-*   @return
+ *   @return
 			The function shall return ZERO for successful operation and a negative value otherwise.
-*/
+ */
 
 NMI_API sint8 hif_chip_wake(void);
 /*!
@@ -200,7 +201,7 @@ NMI_API sint8 hif_chip_wake(void);
 
 @return
 			The function SHALL return 0 for success and a negative value otherwise.
-*/
+ */
 
 NMI_API void hif_set_sleep_mode(uint8 u8Pstype);
 /*!
@@ -212,35 +213,35 @@ NMI_API void hif_set_sleep_mode(uint8 u8Pstype);
 
 @return
 	The function SHALL return the sleep mode of the HIF layer.
-*/
+ */
 
 NMI_API uint8 hif_get_sleep_mode(void);
 
 #ifdef CORTUS_APP
 /**
-*	@fn		hif_Resp_handler(uint8 *pu8Buffer, uint16 u16BufferSize)
-*	@brief
+ *	@fn		hif_Resp_handler(uint8 *pu8Buffer, uint16 u16BufferSize)
+ *	@brief
 				Response handler for HIF layer.
 
-*	@param [in]	pu8Buffer
+ *	@param [in]	pu8Buffer
 				Pointer to the buffer.
 
-*	@param [in]	u16BufferSize
+ *	@param [in]	u16BufferSize
 				Buffer size.
 
-*   @return
+ *   @return
 			    The function SHALL return 0 for success and a negative value otherwise.
-*/
+ */
 NMI_API sint8 hif_Resp_handler(uint8 *pu8Buffer, uint16 u16BufferSize);
 #endif
 
 /**
-*	@fn		hif_handle_isr(void)
-*	@brief
+ *	@fn		hif_handle_isr(void)
+ *	@brief
 			Handle interrupt received from NMC1500 firmware.
-*   @return
+ *   @return
 			The function SHALL return 0 for success and a negative value otherwise.
-*/
+ */
 NMI_API sint8 hif_handle_isr(void);
 
 #ifdef __cplusplus

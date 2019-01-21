@@ -1,41 +1,41 @@
 /* USER CODE BEGIN Header */
 /**
-  ******************************************************************************
-  * @file           : main.c
-  * @brief          : Main program body
-  ******************************************************************************
-  ** This notice applies to any and all portions of this file
-  * that are not between comment pairs USER CODE BEGIN and
-  * USER CODE END. Other portions of this file, whether 
-  * inserted by the user or by software development tools
-  * are owned by their respective copyright owners.
-  *
-  * COPYRIGHT(c) 2019 STMicroelectronics
-  *
-  * Redistribution and use in source and binary forms, with or without modification,
-  * are permitted provided that the following conditions are met:
-  *   1. Redistributions of source code must retain the above copyright notice,
-  *      this list of conditions and the following disclaimer.
-  *   2. Redistributions in binary form must reproduce the above copyright notice,
-  *      this list of conditions and the following disclaimer in the documentation
-  *      and/or other materials provided with the distribution.
-  *   3. Neither the name of STMicroelectronics nor the names of its contributors
-  *      may be used to endorse or promote products derived from this software
-  *      without specific prior written permission.
-  *
-  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
-  * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
-  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-  * DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
-  * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
-  * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
-  * SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
-  * CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-  *
-  ******************************************************************************
-  */
+ ******************************************************************************
+ * @file           : main.c
+ * @brief          : Main program body
+ ******************************************************************************
+ ** This notice applies to any and all portions of this file
+ * that are not between comment pairs USER CODE BEGIN and
+ * USER CODE END. Other portions of this file, whether
+ * inserted by the user or by software development tools
+ * are owned by their respective copyright owners.
+ *
+ * COPYRIGHT(c) 2019 STMicroelectronics
+ *
+ * Redistribution and use in source and binary forms, with or without modification,
+ * are permitted provided that the following conditions are met:
+ *   1. Redistributions of source code must retain the above copyright notice,
+ *      this list of conditions and the following disclaimer.
+ *   2. Redistributions in binary form must reproduce the above copyright notice,
+ *      this list of conditions and the following disclaimer in the documentation
+ *      and/or other materials provided with the distribution.
+ *   3. Neither the name of STMicroelectronics nor the names of its contributors
+ *      may be used to endorse or promote products derived from this software
+ *      without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+ * SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+ * CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+ * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *
+ ******************************************************************************
+ */
 /* USER CODE END Header */
 
 /* Includes ------------------------------------------------------------------*/
@@ -64,11 +64,11 @@
 #define TRCENA          0x01000000
 
 /** Security mode Supported */
-#define USE_WPAPSK 1 /* WPA/WPA2 PSK Security Mode*/
+//#define USE_WPAPSK 1 /* WPA/WPA2 PSK Security Mode*/
 // #define USE_WEP 2 /* WEP Security Mode*/
-// #define USE_OPEN 3 /* No Security or OPEN Authentication Mode*/
+#define USE_OPEN 3 /* No Security or OPEN Authentication Mode*/
 /** AP mode Settings */
-#define MAIN_WLAN_SSID "WINC1500_AP" /* < SSID */
+#define MAIN_WLAN_SSID "SimonsWIFI" /* < SSID */
 #if (defined USE_WPAPSK)
 #define MAIN_WLAN_AUTH M2M_WIFI_SEC_WPA_PSK /* < Security manner */
 #define MAIN_WLAN_WPA_PSK "1234567890" /* < Security Key in WPA PSK Mode */
@@ -110,7 +110,8 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-
+#define MAIN_WIFI_M2M_SERVER_IP 0xc0a80164 //0xFFFFFFFF /* 255.255.255.255 */
+#define MAIN_WIFI_M2M_SERVER_PORT (6666)
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -134,6 +135,8 @@ static SOCKET tcp_server_socket = -1;
 static SOCKET tcp_client_socket = -1;
 static SOCKET udp_socket = -1;
 
+struct sockaddr_in strAddr;
+
 /** Wi-Fi connection state */
 static volatile uint8_t wifi_connected;
 
@@ -144,6 +147,7 @@ volatile uint8_t temperature = false;
 
 /** Receive buffer definition. */
 static char gau8SocketTestBuffer[MAIN_WIFI_M2M_BUFFER_SIZE];
+uint8_t rxBuffer[256], txBuffer[256];
 
 /** Buffer for wifi password */
 uint8_t password[MAX_LEN];
@@ -177,6 +181,8 @@ static void wifi_cb(uint8_t u8MsgType, void *pvMsg)
 	switch (u8MsgType) {
 	case M2M_WIFI_RESP_SCAN_DONE:
 	{
+		UART_Send_Str(&huart2, "State: M2M_WIFI_RESP_SCAN_DONE\n\r");
+
 		tstrM2mScanDone *pstrInfo = (tstrM2mScanDone *)pvMsg;
 		scan_request_index = 0;
 		if (pstrInfo->u8NumofCh >= 1) {
@@ -191,6 +197,8 @@ static void wifi_cb(uint8_t u8MsgType, void *pvMsg)
 
 	case M2M_WIFI_RESP_SCAN_RESULT:
 	{
+		UART_Send_Str(&huart2, "State: M2M_WIFI_RESP_SCAN_RESULT\n\r");
+
 		tstrM2mWifiscanResult *pstrScanResult = (tstrM2mWifiscanResult *)pvMsg;
 		uint16_t demo_ssid_len;
 		uint16_t scan_ssid_len = strlen((const char *)pstrScanResult->au8SSID);
@@ -204,8 +212,8 @@ static void wifi_cb(uint8_t u8MsgType, void *pvMsg)
 			demo_ssid_len = strlen((const char *)MAIN_WLAN_SSID);
 			if
 			(
-				(demo_ssid_len == scan_ssid_len) &&
-				(!memcmp(pstrScanResult->au8SSID, (uint8_t *)MAIN_WLAN_SSID, demo_ssid_len))
+					(demo_ssid_len == scan_ssid_len) &&
+					(!memcmp(pstrScanResult->au8SSID, (uint8_t *)MAIN_WLAN_SSID, demo_ssid_len))
 			) {
 				/* A scan result matches an entry in the preferred AP List.
 				 * Initiate a connection request.
@@ -233,11 +241,14 @@ static void wifi_cb(uint8_t u8MsgType, void *pvMsg)
 
 	case M2M_WIFI_RESP_CON_STATE_CHANGED:
 	{
+		UART_Send_Str(&huart2, "State: M2M_WIFI_RESP_CON_STATE_CHANGED\n\r");
+
 		tstrM2mWifiStateChanged *pstrWifiState = (tstrM2mWifiStateChanged *)pvMsg;
 		if (pstrWifiState->u8CurrState == M2M_WIFI_CONNECTED) {
+			UART_Send_Str(&huart2, "Wi-Fi connected\r\n");
 			m2m_wifi_request_dhcp_client();
 		} else if (pstrWifiState->u8CurrState == M2M_WIFI_DISCONNECTED) {
-			printf("Wi-Fi disconnected\r\n");
+			UART_Send_Str(&huart2, "Wi-Fi disconnected\r\n");
 
 			/* Request scan. */
 			m2m_wifi_request_scan(M2M_WIFI_CH_ALL);
@@ -248,10 +259,14 @@ static void wifi_cb(uint8_t u8MsgType, void *pvMsg)
 
 	case M2M_WIFI_REQ_DHCP_CONF:
 	{
+		UART_Send_Str(&huart2, "State: M2M_WIFI_REQ_DHCP_CONF\n\r");
 		uint8_t *pu8IPAddress = (uint8_t *)pvMsg;
-		printf("Wi-Fi connected\r\n");
-		printf("Wi-Fi IP is %u.%u.%u.%u\r\n",
-				pu8IPAddress[0], pu8IPAddress[1], pu8IPAddress[2], pu8IPAddress[3]);
+		UART_Send_Str(&huart2, "Wi-Fi connected\r\n");
+		UART_Send_Str(&huart2, "Wi-Fi IP is ");
+		UART_Send_IntAndStr(&huart2, pu8IPAddress[0], ".");
+		UART_Send_IntAndStr(&huart2, pu8IPAddress[1], ".");
+		UART_Send_IntAndStr(&huart2, pu8IPAddress[2], ".");
+		UART_Send_IntAndStr(&huart2, pu8IPAddress[3], "\r\n");
 		break;
 	}
 
@@ -259,6 +274,230 @@ static void wifi_cb(uint8_t u8MsgType, void *pvMsg)
 	{
 		break;
 	}
+	}
+}
+
+void tcpClientSocketEventHandler(SOCKET sock, uint8 u8Msg, void * pvMsg)
+{
+	if(sock == tcp_client_socket)
+	{
+		if(u8Msg == SOCKET_MSG_CONNECT)
+		{
+			UART_Send_Str(&huart2, "State: SOCKET_MSG_CONNECT\n\r");
+
+			// Connect Event Handler
+			tstrSocketConnectMsg *pstrConnect = (tstrSocketConnectMsg*)pvMsg;
+
+			if(pstrConnect->s8Error == 0)
+			{
+				// Perform data exchange
+				uint16_t u16MsgSize;
+
+				// Fill in the txBuffer with some data here
+				txBuffer[0] = 8;
+				txBuffer[1] = 0;
+				txBuffer[2] = 0;
+				txBuffer[3] = 8;
+				txBuffer[4] = 5;
+				// Send data
+				send(tcp_client_socket, txBuffer, u16MsgSize, 0);
+				// Recv response from server
+				recv(tcp_client_socket, rxBuffer, sizeof(rxBuffer) , 0);
+			}
+			else
+			{
+				UART_Send_Str(&huart2, "TCP Connection Failed\n");
+			}
+		}
+		else if(u8Msg == SOCKET_MSG_RECV)
+		{
+			UART_Send_Str(&huart2, "State: SOCKET_MSG_RECV\n\r");
+
+			tstrSocketRecvMsg *pstrRecvMsg = (tstrSocketRecvMsg*)pvMsg;
+
+			// If not empty
+			if((pstrRecvMsg->pu8Buffer != NULL) && (pstrRecvMsg->s16BufferSize > 0))
+			{
+				// Process the received message
+				for(int i=0; i < pstrRecvMsg->s16BufferSize; i++)
+				{
+					UART_Send_Int(&huart2, pstrRecvMsg->pu8Buffer[i]);
+				}
+
+				UART_Send_Str(&huart2, "\nEnd of message\n");
+
+				// Close the socket
+				close(tcp_client_socket);
+			}
+		}
+	}
+}
+
+void dnsResolveCallback(uint8_t* pu8HostName, uint32_t u32ServerIP)
+{
+	struct sockaddr_in strAddr;
+
+	if(u32ServerIP != 0)
+	{
+		tcp_client_socket = socket(AF_INET, SOCK_STREAM, 0);
+		if(tcp_client_socket >= 0)
+		{
+			strAddr.sin_family		= AF_INET;
+			strAddr.sin_port		= _htons(MAIN_WIFI_M2M_SERVER_PORT);
+			strAddr.sin_addr.s_addr	= _htonl(MAIN_WIFI_M2M_SERVER_IP);
+
+			int ret = connect(tcp_client_socket, (struct sockaddr*)&strAddr, sizeof(struct sockaddr_in));
+			if (ret != M2M_SUCCESS)
+			{
+				UART_Send_Str(&huart2, "Connected to TCP server\n\r");
+			}
+			else
+			{
+				UART_Send_Str(&huart2, "Connection failed to TCP server\n\r");
+			}
+		}
+	}
+	else
+	{
+		UART_Send_Str(&huart2, "DNs Resolution Failed\n");
+	}
+}
+
+void udpClientSocketEventHandler(SOCKET sock, uint8 u8Msg, void * pvMsg)
+{
+	if((u8Msg == SOCKET_MSG_RECV) || (u8Msg == SOCKET_MSG_RECVFROM))
+	{
+		tstrSocketRecvMsg *pstrRecvMsg = (tstrSocketRecvMsg*)pvMsg;
+		if((pstrRecvMsg->pu8Buffer != NULL) && (pstrRecvMsg->s16BufferSize > 0))
+		{
+			uint16 len;
+			// Format a message in the txBuffer and put its length in len
+			txBuffer[0] = 0;
+			txBuffer[1] = 1;
+			txBuffer[2] = 2;
+			len = 3;
+
+			sendto(udp_socket, txBuffer, len, 0,
+					(struct sockaddr*)&strAddr, sizeof(struct sockaddr_in));
+
+			recvfrom(udp_socket, rxBuffer, sizeof(rxBuffer), 0);
+
+			// Close the socket after finished
+			close(udp_socket);
+		}
+	}
+}
+
+void udpClientStart(char *pcServerIP, uint16_t port)
+{
+	// Initialize the socket layer.
+	socketInit();
+
+	// Register socket application callbacks.
+	registerSocketCallback(udpClientSocketEventHandler, NULL);
+
+	udp_socket = socket(AF_INET, SOCK_STREAM, 0);
+	if(udp_socket >= 0)
+	{
+		uint16 len;
+		strAddr.sin_family = AF_INET;
+		strAddr.sin_port = _htons(port);
+		strAddr.sin_addr.s_addr = nmi_inet_addr(pcServerIP);
+
+		// Format some message in the txBuffer and put its length in len
+		txBuffer[0] = 0;
+		txBuffer[1] = 1;
+		txBuffer[2] = 2;
+		len = 3;
+
+		sendto(udp_socket, txBuffer, len, 0, (struct sockaddr*)&strAddr,
+				sizeof(struct sockaddr_in));
+
+		recvfrom(udp_socket, rxBuffer, sizeof(rxBuffer), 0);
+
+		UART_Send_Str(&huart2, "Message received: ");
+		UART_Send_Str(&huart2, rxBuffer);
+		UART_Send_Str(&huart2, "\n\r");
+	}
+}
+
+void udpServerSocketEventHandler(SOCKET sock, uint8 u8Msg, void * pvMsg)
+{
+	if(u8Msg == SOCKET_MSG_BIND)
+	{
+		tstrSocketBindMsg *pstrBind = (tstrSocketBindMsg*)pvMsg;
+		if(pstrBind->status == 0)
+		{
+			UART_Send_Str(&huart2, "Bind Success\n\r");
+			// call Recv
+			recvfrom(udp_socket, rxBuffer, sizeof(rxBuffer), 0);
+			UART_Send_Str(&huart2, "Message received: ");
+			UART_Send_Str(&huart2, rxBuffer);
+			UART_Send_Str(&huart2, "\n\r");
+		}
+		else
+		{
+			UART_Send_Str(&huart2, "Bind Failed\n\r");
+		}
+	}
+	else if(u8Msg == SOCKET_MSG_RECV)
+	{
+		tstrSocketRecvMsg *pstrRecvMsg = (tstrSocketRecvMsg*)pvMsg;
+		if((pstrRecvMsg->pu8Buffer != NULL) && (pstrRecvMsg->s16BufferSize > 0))
+		{
+			// Perform data exchange.
+			uint16 len;
+
+			// Fill in the acSendBuffer with some data
+			txBuffer[0] = 0;
+			txBuffer[1] = 1;
+			txBuffer[2] = 2;
+			len = 3;
+
+			// Send some data to the same address.
+			/*sendto(udp_socket, txBuffer, len, 0,
+					&pstrRecvMsg->strRemoteAddr, sizeof(pstrRecvMsg->strRemoteAddr));*/
+
+
+			// call Recv
+			recvfrom(udp_socket, rxBuffer, sizeof(rxBuffer), 0);
+
+			UART_Send_Str(&huart2, "Message received: ");
+			UART_Send_Str(&huart2, rxBuffer);
+			UART_Send_Str(&huart2, "\n\r");
+
+			// Close the socket when finished.
+			close(udp_socket);
+		}
+	}
+}
+
+void udpStartServer(uint16 u16ServerPort)
+{
+	// Initialize the socket layer.
+	socketInit();
+
+	// Register socket application callbacks.
+	registerSocketCallback(udpServerSocketEventHandler, NULL);
+
+	// Create the server listen socket.
+	udp_socket = socket(AF_INET, SOCK_DGRAM, 0);
+	if(udp_socket >= 0)
+	{
+		strAddr.sin_family = AF_INET;
+		strAddr.sin_port = _htons(u16ServerPort);
+		strAddr.sin_addr.s_addr = MAIN_WIFI_M2M_SERVER_IP; //INADDR_ANY
+
+		int ret = bind(udp_socket, (struct sockaddr*)&strAddr, sizeof(struct sockaddr_in));
+
+		if (ret == M2M_SUCCESS)
+		{
+			UART_Send_Str(&huart2, "WINC1500 Wifi Bind Success\n\r");
+		}
+		else
+		{
+			UART_Send_Str(&huart2, "WINC1500 Wifi Bind Failed\n\r");
+		}
 	}
 }
 
@@ -271,6 +510,13 @@ void spi_dummy_send(void)
 	HAL_GPIO_WritePin(WINC_CS_GPIO_Port, WINC_CS_Pin, GPIO_PIN_SET);
 }
 
+void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
+{
+	if(GPIO_Pin==GPIO_PIN_9)
+	{
+		isr();
+	}
+}
 /* USER CODE END 0 */
 
 /**
@@ -315,25 +561,56 @@ int main(void)
 	}*/
 
 	tstrWifiInitParam param;
-		int8_t ret;
+	int8_t ret;
 
-		// Initialize the WiFi BSP:
-		nm_bsp_init();
+	// Initialize the WiFi BSP:
+	nm_bsp_init();
 
-		// Initialize WiFi module and register status callback:
-		m2m_memset((uint8*)&param, 0, sizeof(param));
-		param.pfAppWifiCb = wifi_cb;
+	// Initialize WiFi parameters structure
+	m2m_memset((uint8*)&param, 0, sizeof(param));
+	param.pfAppWifiCb = wifi_cb;
 
+	// Initialize WiFi module and register status callback:
+	ret = m2m_wifi_init(&param);
+	if (M2M_SUCCESS != ret && M2M_ERR_FW_VER_MISMATCH != ret) {
+		M2M_ERR("Driver Init Failed <%d>\n",ret);
+		UART_Send_Str(&huart2, "WINC1500 Wifi Initialization failed\n\r");
+	}
+	else
+	{
+		UART_Send_Str(&huart2, "WINC1500 Wifi Initialized\n\r");
+	}
 
-		ret = m2m_wifi_init(&param);
-		if (M2M_SUCCESS != ret && M2M_ERR_FW_VER_MISMATCH != ret) {
-			M2M_ERR("Driver Init Failed <%d>\n",ret);
-		}
+	// Initialize socket
+	udpStartServer(MAIN_WIFI_M2M_SERVER_PORT);
 
 	// Start Connect
-	if (wincStartConnect("SimonsWifi", M2M_WIFI_SEC_OPEN, NULL, 6) != M2M_SUCCESS)
+	/*ret = m2m_wifi_connect((char *)MAIN_WLAN_SSID, sizeof(MAIN_WLAN_SSID), MAIN_WLAN_AUTH,
+			(char *)MAIN_WLAN_PSK, M2M_WIFI_CH_ALL);*/
+	//ret = wincStartConnect("SimonsWifix", M2M_WIFI_SEC_OPEN, NULL, 6);
+
+	tstrM2MAPConfig apConfig;
+	strcpy(apConfig.au8SSID, "WINC1500_AP"); // Set SSID
+	apConfig.u8SsidHide = SSID_MODE_VISIBLE; // Set SSID to be broadcasted
+	apConfig.u8ListenChannel = 1; // Set Channel
+	apConfig.u8SecType = MAIN_WLAN_AUTH; // Set Security to OPEN
+
+	// IP Address
+	apConfig.au8DHCPServerIP[0] = 192;
+	apConfig.au8DHCPServerIP[1] = 168;
+	apConfig.au8DHCPServerIP[2] = 1;
+	apConfig.au8DHCPServerIP[3] = 100;
+
+	// Start AP mode
+	ret = m2m_wifi_enable_ap(&apConfig);
+	if (ret != M2M_SUCCESS)
 	{
+		UART_Send_Str(&huart2, "WINC1500 Wifi failed to connect\n\r");
 		result = M2M_ERR_JOIN_FAIL;
+	}
+	else
+	{
+		UART_Send_Str(&huart2, "WINC1500 Wifi Connected\n\r");
 	}
 
 
@@ -524,8 +801,8 @@ static void MX_GPIO_Init(void)
 
   /*Configure GPIO pin : WINC_IRQ_Pin */
   GPIO_InitStruct.Pin = WINC_IRQ_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Mode = GPIO_MODE_IT_FALLING;
+  GPIO_InitStruct.Pull = GPIO_PULLUP;
   HAL_GPIO_Init(WINC_IRQ_GPIO_Port, &GPIO_InitStruct);
 
   /* EXTI interrupt init*/
