@@ -68,7 +68,7 @@
 // #define USE_WEP 2 /* WEP Security Mode*/
 #define USE_OPEN 3 /* No Security or OPEN Authentication Mode*/
 /** AP mode Settings */
-#define MAIN_WLAN_SSID "SimonsWIFI" /* < SSID */
+#define MAIN_WLAN_SSID "WINC1500_AP" /* < SSID */
 #if (defined USE_WPAPSK)
 #define MAIN_WLAN_AUTH M2M_WIFI_SEC_WPA_PSK /* < Security manner */
 #define MAIN_WLAN_WPA_PSK "1234567890" /* < Security Key in WPA PSK Mode */
@@ -110,6 +110,7 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
+#define MAIN_WIFI_M2M_PRODUCT_NAME        "NMCTemp"
 #define MAIN_WIFI_M2M_SERVER_IP 0xc0a80164 //0xFFFFFFFF /* 255.255.255.255 */
 #define MAIN_WIFI_M2M_SERVER_PORT (6666)
 /* USER CODE END PD */
@@ -149,6 +150,24 @@ volatile uint8_t temperature = false;
 static char gau8SocketTestBuffer[MAIN_WIFI_M2M_BUFFER_SIZE];
 uint8_t rxBuffer[256], txBuffer[256];
 
+/** Message format definitions. */
+typedef struct s_msg_wifi_product {
+	uint8_t name[9];
+} t_msg_wifi_product;
+
+typedef struct s_msg_wifi_product_main {
+	uint8_t name[9];
+} t_msg_wifi_product_main;
+
+/** Message format declarations. */
+static t_msg_wifi_product msg_wifi_product = {
+	.name = MAIN_WIFI_M2M_PRODUCT_NAME,
+};
+
+static t_msg_wifi_product_main msg_wifi_product_main = {
+	.name = MAIN_WIFI_M2M_PRODUCT_NAME,
+};
+
 /** Buffer for wifi password */
 uint8_t password[MAX_LEN];
 /** Buffer for wifi SSID*/
@@ -162,6 +181,8 @@ uint8_t provision = 1;
 extern time_flags_typedef timeFlags;
 
 int result = 0;
+
+int arefCount = 0;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -261,7 +282,7 @@ static void wifi_cb(uint8_t u8MsgType, void *pvMsg)
 	{
 		UART_Send_Str(&huart2, "State: M2M_WIFI_REQ_DHCP_CONF\n\r");
 		uint8_t *pu8IPAddress = (uint8_t *)pvMsg;
-		UART_Send_Str(&huart2, "Wi-Fi connected\r\n");
+		UART_Send_Str(&huart2, "Wi-Fi configured\r\n");
 		UART_Send_Str(&huart2, "Wi-Fi IP is ");
 		UART_Send_IntAndStr(&huart2, pu8IPAddress[0], ".");
 		UART_Send_IntAndStr(&huart2, pu8IPAddress[1], ".");
@@ -367,6 +388,8 @@ void udpClientSocketEventHandler(SOCKET sock, uint8 u8Msg, void * pvMsg)
 {
 	if((u8Msg == SOCKET_MSG_RECV) || (u8Msg == SOCKET_MSG_RECVFROM))
 	{
+		UART_Send_Str(&huart2, "State: SOCKET_MSG_RECV\n\r");
+
 		tstrSocketRecvMsg *pstrRecvMsg = (tstrSocketRecvMsg*)pvMsg;
 		if((pstrRecvMsg->pu8Buffer != NULL) && (pstrRecvMsg->s16BufferSize > 0))
 		{
@@ -382,9 +405,20 @@ void udpClientSocketEventHandler(SOCKET sock, uint8 u8Msg, void * pvMsg)
 
 			recvfrom(udp_socket, rxBuffer, sizeof(rxBuffer), 0);
 
+			UART_Send_Str(&huart2, "Message received: ");
+			UART_Send_Str(&huart2, rxBuffer);
+			UART_Send_Str(&huart2, "\n\r");
+
 			// Close the socket after finished
 			close(udp_socket);
 		}
+	}
+	else if (u8Msg == SOCKET_MSG_SENDTO)
+	{
+		UART_Send_Str(&huart2, "State: SOCKET_MSG_SENDTO\n\r");
+
+		UART_Send_Str(&huart2, "Sent HejAref nr: ");
+		UART_Send_IntAndStr(&huart2, arefCount, "\n\r");
 	}
 }
 
@@ -399,75 +433,97 @@ void udpClientStart(char *pcServerIP, uint16_t port)
 	udp_socket = socket(AF_INET, SOCK_STREAM, 0);
 	if(udp_socket >= 0)
 	{
-		uint16 len;
+		uint16 len, rxLen;
 		strAddr.sin_family = AF_INET;
 		strAddr.sin_port = _htons(port);
-		strAddr.sin_addr.s_addr = nmi_inet_addr(pcServerIP);
+		strAddr.sin_addr.s_addr = _htonl(MAIN_WIFI_M2M_SERVER_IP); //nmi_inet_addr(pcServerIP);
 
 		// Format some message in the txBuffer and put its length in len
-		txBuffer[0] = 0;
-		txBuffer[1] = 1;
-		txBuffer[2] = 2;
-		len = 3;
+		strcpy(txBuffer, "Hello Aref");
+		len = strlen(txBuffer);
 
 		sendto(udp_socket, txBuffer, len, 0, (struct sockaddr*)&strAddr,
 				sizeof(struct sockaddr_in));
 
-		recvfrom(udp_socket, rxBuffer, sizeof(rxBuffer), 0);
+		/*rxLen = recvfrom(udp_socket, rxBuffer, sizeof(rxBuffer), 0);
 
-		UART_Send_Str(&huart2, "Message received: ");
-		UART_Send_Str(&huart2, rxBuffer);
-		UART_Send_Str(&huart2, "\n\r");
+		if (rxLen > 0)
+		{
+			rxBuffer[rxLen] = '\0';
+			UART_Send_Str(&huart2, "Message received: ");
+			UART_Send_Str(&huart2, rxBuffer);
+			UART_Send_Str(&huart2, "\n\r");
+		}*/
 	}
+}
+
+static const char *inet_ntop4(const unsigned char *src, char *dst, size_t size)
+{
+	static const char fmt[] = "%u.%u.%u.%u";
+	char tmp[sizeof "255.255.255.255"];
+
+	sprintf(tmp, fmt, src[0], src[1], src[2], src[3]);
+	if (strlen(tmp) > size) {
+		return (NULL);
+	}
+	strcpy(dst, tmp);
+	return (dst);
 }
 
 void udpServerSocketEventHandler(SOCKET sock, uint8 u8Msg, void * pvMsg)
 {
 	if(u8Msg == SOCKET_MSG_BIND)
 	{
+		UART_Send_Str(&huart2, "State: SOCKET_MSG_BIND\n\r");
+
 		tstrSocketBindMsg *pstrBind = (tstrSocketBindMsg*)pvMsg;
 		if(pstrBind->status == 0)
 		{
 			UART_Send_Str(&huart2, "Bind Success\n\r");
+
 			// call Recv
 			recvfrom(udp_socket, rxBuffer, sizeof(rxBuffer), 0);
-			UART_Send_Str(&huart2, "Message received: ");
-			UART_Send_Str(&huart2, rxBuffer);
-			UART_Send_Str(&huart2, "\n\r");
 		}
 		else
 		{
 			UART_Send_Str(&huart2, "Bind Failed\n\r");
 		}
 	}
-	else if(u8Msg == SOCKET_MSG_RECV)
+	else if(/*u8Msg == SOCKET_MSG_RECV || */u8Msg == SOCKET_MSG_RECVFROM)
 	{
+		UART_Send_Str(&huart2, "State: SOCKET_MSG_RECVFROM\n\r");
+
 		tstrSocketRecvMsg *pstrRecvMsg = (tstrSocketRecvMsg*)pvMsg;
 		if((pstrRecvMsg->pu8Buffer != NULL) && (pstrRecvMsg->s16BufferSize > 0))
 		{
-			// Perform data exchange.
+			char remote_addr[16];
+			inet_ntop4((unsigned char*)&pstrRecvMsg->strRemoteAddr.sin_addr, &remote_addr, 16);
+
+			// Handle received data.
+			UART_Send_Str(&huart2, "Message received from ");
+			UART_Send_Str(&huart2, remote_addr);
+			UART_Send_Str(&huart2, ": ");
+			UART_Send_Str(&huart2, rxBuffer);
+			UART_Send_Str(&huart2, "\n\r");
+
 			uint16 len;
 
-			// Fill in the acSendBuffer with some data
+			// Fill in the txBuffer with some data
 			txBuffer[0] = 0;
 			txBuffer[1] = 1;
 			txBuffer[2] = 2;
 			len = 3;
 
 			// Send some data to the same address.
-			/*sendto(udp_socket, txBuffer, len, 0,
-					&pstrRecvMsg->strRemoteAddr, sizeof(pstrRecvMsg->strRemoteAddr));*/
-
-
+			sendto(udp_socket, txBuffer, len, 0,
+					&pstrRecvMsg->strRemoteAddr, sizeof(pstrRecvMsg->strRemoteAddr));
 			// call Recv
 			recvfrom(udp_socket, rxBuffer, sizeof(rxBuffer), 0);
 
-			UART_Send_Str(&huart2, "Message received: ");
-			UART_Send_Str(&huart2, rxBuffer);
-			UART_Send_Str(&huart2, "\n\r");
+
 
 			// Close the socket when finished.
-			close(udp_socket);
+			//close(udp_socket);
 		}
 	}
 }
@@ -486,7 +542,7 @@ void udpStartServer(uint16 u16ServerPort)
 	{
 		strAddr.sin_family = AF_INET;
 		strAddr.sin_port = _htons(u16ServerPort);
-		strAddr.sin_addr.s_addr = MAIN_WIFI_M2M_SERVER_IP; //INADDR_ANY
+		strAddr.sin_addr.s_addr = _htonl(MAIN_WIFI_M2M_SERVER_IP); //INADDR_ANY
 
 		int ret = bind(udp_socket, (struct sockaddr*)&strAddr, sizeof(struct sockaddr_in));
 
@@ -520,36 +576,36 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 /* USER CODE END 0 */
 
 /**
-  * @brief  The application entry point.
-  * @retval int
-  */
+ * @brief  The application entry point.
+ * @retval int
+ */
 int main(void)
 {
-  /* USER CODE BEGIN 1 */
+	/* USER CODE BEGIN 1 */
 
-  /* USER CODE END 1 */
+	/* USER CODE END 1 */
 
-  /* MCU Configuration--------------------------------------------------------*/
+	/* MCU Configuration--------------------------------------------------------*/
 
-  /* Reset of all peripherals, Initializes the Flash interface and the Systick. */
-  HAL_Init();
+	/* Reset of all peripherals, Initializes the Flash interface and the Systick. */
+	HAL_Init();
 
-  /* USER CODE BEGIN Init */
+	/* USER CODE BEGIN Init */
 
-  /* USER CODE END Init */
+	/* USER CODE END Init */
 
-  /* Configure the system clock */
-  SystemClock_Config();
+	/* Configure the system clock */
+	SystemClock_Config();
 
-  /* USER CODE BEGIN SysInit */
+	/* USER CODE BEGIN SysInit */
 
-  /* USER CODE END SysInit */
+	/* USER CODE END SysInit */
 
-  /* Initialize all configured peripherals */
-  MX_GPIO_Init();
-  MX_USART2_UART_Init();
-  MX_SPI2_Init();
-  /* USER CODE BEGIN 2 */
+	/* Initialize all configured peripherals */
+	MX_GPIO_Init();
+	MX_USART2_UART_Init();
+	MX_SPI2_Init();
+	/* USER CODE BEGIN 2 */
 
 	// Init SPI with dummy byte
 	spi_dummy_send();
@@ -581,12 +637,11 @@ int main(void)
 		UART_Send_Str(&huart2, "WINC1500 Wifi Initialized\n\r");
 	}
 
-	// Initialize socket
-	udpStartServer(MAIN_WIFI_M2M_SERVER_PORT);
+
 
 	// Start Connect
-	/*ret = m2m_wifi_connect((char *)MAIN_WLAN_SSID, sizeof(MAIN_WLAN_SSID), MAIN_WLAN_AUTH,
-			(char *)MAIN_WLAN_PSK, M2M_WIFI_CH_ALL);*/
+	//ret = m2m_wifi_connect((char *)MAIN_WLAN_SSID, sizeof(MAIN_WLAN_SSID), MAIN_WLAN_AUTH,
+	//		(char *)MAIN_WLAN_PSK, 1);
 	//ret = wincStartConnect("SimonsWifix", M2M_WIFI_SEC_OPEN, NULL, 6);
 
 	tstrM2MAPConfig apConfig;
@@ -603,6 +658,7 @@ int main(void)
 
 	// Start AP mode
 	ret = m2m_wifi_enable_ap(&apConfig);
+
 	if (ret != M2M_SUCCESS)
 	{
 		UART_Send_Str(&huart2, "WINC1500 Wifi failed to connect\n\r");
@@ -613,201 +669,229 @@ int main(void)
 		UART_Send_Str(&huart2, "WINC1500 Wifi Connected\n\r");
 	}
 
+	// Wait for connection
+	nm_bsp_sleep(10000);
+
+	// Initialize socket
+	udpClientStart((char*)0xc0a80164, MAIN_WIFI_M2M_SERVER_PORT);
+
+	//udpStartServer(MAIN_WIFI_M2M_SERVER_PORT);
 
 
-  /* USER CODE END 2 */
 
-  /* Infinite loop */
-  /* USER CODE BEGIN WHILE */
+	/* USER CODE END 2 */
+
+	/* Infinite loop */
+	/* USER CODE BEGIN WHILE */
 	while (1)
 	{
 		m2m_wifi_handle_events(NULL);
-    /* USER CODE END WHILE */
 
-    /* USER CODE BEGIN 3 */
+		HAL_Delay(1000);
+
+		arefCount++;
+
+		strcpy(txBuffer, "HejAref");
+		int len = strlen(txBuffer);
+		ret = sendto(udp_socket, txBuffer, len, 0, (struct sockaddr*)&strAddr,
+						sizeof(struct sockaddr_in));
+		ret = sendto(udp_socket, &msg_wifi_product, sizeof(t_msg_wifi_product), 0, (struct sockaddr*)&strAddr,
+				sizeof(struct sockaddr_in));
+		if (ret == M2M_SUCCESS)
+		{
+			UART_Send_Str(&huart2, "Message sent\n\r");
+		}
+		else
+		{
+			UART_Send_Str(&huart2, "Failed to send message\n\r");
+		}
+
+		/* USER CODE END WHILE */
+
+		/* USER CODE BEGIN 3 */
 
 	}
-  /* USER CODE END 3 */
+	/* USER CODE END 3 */
 }
 
 /**
-  * @brief System Clock Configuration
-  * @retval None
-  */
+ * @brief System Clock Configuration
+ * @retval None
+ */
 void SystemClock_Config(void)
 {
-  RCC_OscInitTypeDef RCC_OscInitStruct = {0};
-  RCC_ClkInitTypeDef RCC_ClkInitStruct = {0};
-  RCC_PeriphCLKInitTypeDef PeriphClkInit = {0};
+	RCC_OscInitTypeDef RCC_OscInitStruct = {0};
+	RCC_ClkInitTypeDef RCC_ClkInitStruct = {0};
+	RCC_PeriphCLKInitTypeDef PeriphClkInit = {0};
 
-  /**Initializes the CPU, AHB and APB busses clocks 
-  */
-  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSI;
-  RCC_OscInitStruct.HSIState = RCC_HSI_ON;
-  RCC_OscInitStruct.HSICalibrationValue = RCC_HSICALIBRATION_DEFAULT;
-  RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
-  RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSI;
-  RCC_OscInitStruct.PLL.PLLM = 1;
-  RCC_OscInitStruct.PLL.PLLN = 10;
-  RCC_OscInitStruct.PLL.PLLP = RCC_PLLP_DIV7;
-  RCC_OscInitStruct.PLL.PLLQ = RCC_PLLQ_DIV2;
-  RCC_OscInitStruct.PLL.PLLR = RCC_PLLR_DIV2;
-  if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  /**Initializes the CPU, AHB and APB busses clocks 
-  */
-  RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK|RCC_CLOCKTYPE_SYSCLK
-                              |RCC_CLOCKTYPE_PCLK1|RCC_CLOCKTYPE_PCLK2;
-  RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_PLLCLK;
-  RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV1;
-  RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV1;
-  RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV1;
+	/**Initializes the CPU, AHB and APB busses clocks
+	 */
+	RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSI;
+	RCC_OscInitStruct.HSIState = RCC_HSI_ON;
+	RCC_OscInitStruct.HSICalibrationValue = RCC_HSICALIBRATION_DEFAULT;
+	RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
+	RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSI;
+	RCC_OscInitStruct.PLL.PLLM = 1;
+	RCC_OscInitStruct.PLL.PLLN = 10;
+	RCC_OscInitStruct.PLL.PLLP = RCC_PLLP_DIV7;
+	RCC_OscInitStruct.PLL.PLLQ = RCC_PLLQ_DIV2;
+	RCC_OscInitStruct.PLL.PLLR = RCC_PLLR_DIV2;
+	if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK)
+	{
+		Error_Handler();
+	}
+	/**Initializes the CPU, AHB and APB busses clocks
+	 */
+	RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK|RCC_CLOCKTYPE_SYSCLK
+			|RCC_CLOCKTYPE_PCLK1|RCC_CLOCKTYPE_PCLK2;
+	RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_PLLCLK;
+	RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV1;
+	RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV1;
+	RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV1;
 
-  if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_4) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  PeriphClkInit.PeriphClockSelection = RCC_PERIPHCLK_USART2;
-  PeriphClkInit.Usart2ClockSelection = RCC_USART2CLKSOURCE_PCLK1;
-  if (HAL_RCCEx_PeriphCLKConfig(&PeriphClkInit) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  /**Configure the main internal regulator output voltage 
-  */
-  if (HAL_PWREx_ControlVoltageScaling(PWR_REGULATOR_VOLTAGE_SCALE1) != HAL_OK)
-  {
-    Error_Handler();
-  }
+	if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_4) != HAL_OK)
+	{
+		Error_Handler();
+	}
+	PeriphClkInit.PeriphClockSelection = RCC_PERIPHCLK_USART2;
+	PeriphClkInit.Usart2ClockSelection = RCC_USART2CLKSOURCE_PCLK1;
+	if (HAL_RCCEx_PeriphCLKConfig(&PeriphClkInit) != HAL_OK)
+	{
+		Error_Handler();
+	}
+	/**Configure the main internal regulator output voltage
+	 */
+	if (HAL_PWREx_ControlVoltageScaling(PWR_REGULATOR_VOLTAGE_SCALE1) != HAL_OK)
+	{
+		Error_Handler();
+	}
 }
 
 /**
-  * @brief SPI2 Initialization Function
-  * @param None
-  * @retval None
-  */
+ * @brief SPI2 Initialization Function
+ * @param None
+ * @retval None
+ */
 static void MX_SPI2_Init(void)
 {
 
-  /* USER CODE BEGIN SPI2_Init 0 */
+	/* USER CODE BEGIN SPI2_Init 0 */
 
-  /* USER CODE END SPI2_Init 0 */
+	/* USER CODE END SPI2_Init 0 */
 
-  /* USER CODE BEGIN SPI2_Init 1 */
+	/* USER CODE BEGIN SPI2_Init 1 */
 
-  /* USER CODE END SPI2_Init 1 */
-  /* SPI2 parameter configuration*/
-  hspi2.Instance = SPI2;
-  hspi2.Init.Mode = SPI_MODE_MASTER;
-  hspi2.Init.Direction = SPI_DIRECTION_2LINES;
-  hspi2.Init.DataSize = SPI_DATASIZE_8BIT;
-  hspi2.Init.CLKPolarity = SPI_POLARITY_LOW;
-  hspi2.Init.CLKPhase = SPI_PHASE_1EDGE;
-  hspi2.Init.NSS = SPI_NSS_SOFT;
-  hspi2.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_256;
-  hspi2.Init.FirstBit = SPI_FIRSTBIT_MSB;
-  hspi2.Init.TIMode = SPI_TIMODE_DISABLE;
-  hspi2.Init.CRCCalculation = SPI_CRCCALCULATION_DISABLE;
-  hspi2.Init.CRCPolynomial = 7;
-  hspi2.Init.CRCLength = SPI_CRC_LENGTH_DATASIZE;
-  hspi2.Init.NSSPMode = SPI_NSS_PULSE_ENABLE;
-  if (HAL_SPI_Init(&hspi2) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  /* USER CODE BEGIN SPI2_Init 2 */
+	/* USER CODE END SPI2_Init 1 */
+	/* SPI2 parameter configuration*/
+	hspi2.Instance = SPI2;
+	hspi2.Init.Mode = SPI_MODE_MASTER;
+	hspi2.Init.Direction = SPI_DIRECTION_2LINES;
+	hspi2.Init.DataSize = SPI_DATASIZE_8BIT;
+	hspi2.Init.CLKPolarity = SPI_POLARITY_LOW;
+	hspi2.Init.CLKPhase = SPI_PHASE_1EDGE;
+	hspi2.Init.NSS = SPI_NSS_SOFT;
+	hspi2.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_256;
+	hspi2.Init.FirstBit = SPI_FIRSTBIT_MSB;
+	hspi2.Init.TIMode = SPI_TIMODE_DISABLE;
+	hspi2.Init.CRCCalculation = SPI_CRCCALCULATION_DISABLE;
+	hspi2.Init.CRCPolynomial = 7;
+	hspi2.Init.CRCLength = SPI_CRC_LENGTH_DATASIZE;
+	hspi2.Init.NSSPMode = SPI_NSS_PULSE_ENABLE;
+	if (HAL_SPI_Init(&hspi2) != HAL_OK)
+	{
+		Error_Handler();
+	}
+	/* USER CODE BEGIN SPI2_Init 2 */
 
-  /* USER CODE END SPI2_Init 2 */
+	/* USER CODE END SPI2_Init 2 */
 
 }
 
 /**
-  * @brief USART2 Initialization Function
-  * @param None
-  * @retval None
-  */
+ * @brief USART2 Initialization Function
+ * @param None
+ * @retval None
+ */
 static void MX_USART2_UART_Init(void)
 {
 
-  /* USER CODE BEGIN USART2_Init 0 */
+	/* USER CODE BEGIN USART2_Init 0 */
 
-  /* USER CODE END USART2_Init 0 */
+	/* USER CODE END USART2_Init 0 */
 
-  /* USER CODE BEGIN USART2_Init 1 */
+	/* USER CODE BEGIN USART2_Init 1 */
 
-  /* USER CODE END USART2_Init 1 */
-  huart2.Instance = USART2;
-  huart2.Init.BaudRate = 115200;
-  huart2.Init.WordLength = UART_WORDLENGTH_8B;
-  huart2.Init.StopBits = UART_STOPBITS_1;
-  huart2.Init.Parity = UART_PARITY_NONE;
-  huart2.Init.Mode = UART_MODE_TX_RX;
-  huart2.Init.HwFlowCtl = UART_HWCONTROL_NONE;
-  huart2.Init.OverSampling = UART_OVERSAMPLING_16;
-  huart2.Init.OneBitSampling = UART_ONE_BIT_SAMPLE_DISABLE;
-  huart2.AdvancedInit.AdvFeatureInit = UART_ADVFEATURE_NO_INIT;
-  if (HAL_UART_Init(&huart2) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  /* USER CODE BEGIN USART2_Init 2 */
+	/* USER CODE END USART2_Init 1 */
+	huart2.Instance = USART2;
+	huart2.Init.BaudRate = 115200;
+	huart2.Init.WordLength = UART_WORDLENGTH_8B;
+	huart2.Init.StopBits = UART_STOPBITS_1;
+	huart2.Init.Parity = UART_PARITY_NONE;
+	huart2.Init.Mode = UART_MODE_TX_RX;
+	huart2.Init.HwFlowCtl = UART_HWCONTROL_NONE;
+	huart2.Init.OverSampling = UART_OVERSAMPLING_16;
+	huart2.Init.OneBitSampling = UART_ONE_BIT_SAMPLE_DISABLE;
+	huart2.AdvancedInit.AdvFeatureInit = UART_ADVFEATURE_NO_INIT;
+	if (HAL_UART_Init(&huart2) != HAL_OK)
+	{
+		Error_Handler();
+	}
+	/* USER CODE BEGIN USART2_Init 2 */
 
-  /* USER CODE END USART2_Init 2 */
+	/* USER CODE END USART2_Init 2 */
 
 }
 
 /**
-  * @brief GPIO Initialization Function
-  * @param None
-  * @retval None
-  */
+ * @brief GPIO Initialization Function
+ * @param None
+ * @retval None
+ */
 static void MX_GPIO_Init(void)
 {
-  GPIO_InitTypeDef GPIO_InitStruct = {0};
+	GPIO_InitTypeDef GPIO_InitStruct = {0};
 
-  /* GPIO Ports Clock Enable */
-  __HAL_RCC_GPIOC_CLK_ENABLE();
-  __HAL_RCC_GPIOH_CLK_ENABLE();
-  __HAL_RCC_GPIOA_CLK_ENABLE();
-  __HAL_RCC_GPIOB_CLK_ENABLE();
+	/* GPIO Ports Clock Enable */
+	__HAL_RCC_GPIOC_CLK_ENABLE();
+	__HAL_RCC_GPIOH_CLK_ENABLE();
+	__HAL_RCC_GPIOA_CLK_ENABLE();
+	__HAL_RCC_GPIOB_CLK_ENABLE();
 
-  /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_RESET);
+	/*Configure GPIO pin Output Level */
+	HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_RESET);
 
-  /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOC, WINC_CS_Pin|WINC_EN_Pin|WINC_RST_Pin, GPIO_PIN_RESET);
+	/*Configure GPIO pin Output Level */
+	HAL_GPIO_WritePin(GPIOC, WINC_CS_Pin|WINC_EN_Pin|WINC_RST_Pin, GPIO_PIN_RESET);
 
-  /*Configure GPIO pin : B1_Pin */
-  GPIO_InitStruct.Pin = B1_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_IT_FALLING;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
-  HAL_GPIO_Init(B1_GPIO_Port, &GPIO_InitStruct);
+	/*Configure GPIO pin : B1_Pin */
+	GPIO_InitStruct.Pin = B1_Pin;
+	GPIO_InitStruct.Mode = GPIO_MODE_IT_FALLING;
+	GPIO_InitStruct.Pull = GPIO_NOPULL;
+	HAL_GPIO_Init(B1_GPIO_Port, &GPIO_InitStruct);
 
-  /*Configure GPIO pin : LD2_Pin */
-  GPIO_InitStruct.Pin = LD2_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
-  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-  HAL_GPIO_Init(LD2_GPIO_Port, &GPIO_InitStruct);
+	/*Configure GPIO pin : LD2_Pin */
+	GPIO_InitStruct.Pin = LD2_Pin;
+	GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+	GPIO_InitStruct.Pull = GPIO_NOPULL;
+	GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+	HAL_GPIO_Init(LD2_GPIO_Port, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : WINC_CS_Pin WINC_EN_Pin WINC_RST_Pin */
-  GPIO_InitStruct.Pin = WINC_CS_Pin|WINC_EN_Pin|WINC_RST_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
-  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-  HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
+	/*Configure GPIO pins : WINC_CS_Pin WINC_EN_Pin WINC_RST_Pin */
+	GPIO_InitStruct.Pin = WINC_CS_Pin|WINC_EN_Pin|WINC_RST_Pin;
+	GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+	GPIO_InitStruct.Pull = GPIO_NOPULL;
+	GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+	HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
 
-  /*Configure GPIO pin : WINC_IRQ_Pin */
-  GPIO_InitStruct.Pin = WINC_IRQ_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_IT_FALLING;
-  GPIO_InitStruct.Pull = GPIO_PULLUP;
-  HAL_GPIO_Init(WINC_IRQ_GPIO_Port, &GPIO_InitStruct);
+	/*Configure GPIO pin : WINC_IRQ_Pin */
+	GPIO_InitStruct.Pin = WINC_IRQ_Pin;
+	GPIO_InitStruct.Mode = GPIO_MODE_IT_FALLING;
+	GPIO_InitStruct.Pull = GPIO_PULLUP;
+	HAL_GPIO_Init(WINC_IRQ_GPIO_Port, &GPIO_InitStruct);
 
-  /* EXTI interrupt init*/
-  HAL_NVIC_SetPriority(EXTI9_5_IRQn, 0, 0);
-  HAL_NVIC_EnableIRQ(EXTI9_5_IRQn);
+	/* EXTI interrupt init*/
+	HAL_NVIC_SetPriority(EXTI9_5_IRQn, 0, 0);
+	HAL_NVIC_EnableIRQ(EXTI9_5_IRQn);
 
 }
 
@@ -816,33 +900,33 @@ static void MX_GPIO_Init(void)
 /* USER CODE END 4 */
 
 /**
-  * @brief  This function is executed in case of error occurrence.
-  * @retval None
-  */
+ * @brief  This function is executed in case of error occurrence.
+ * @retval None
+ */
 void Error_Handler(void)
 {
-  /* USER CODE BEGIN Error_Handler_Debug */
+	/* USER CODE BEGIN Error_Handler_Debug */
 	/* User can add his own implementation to report the HAL error return state */
 	while(1)
 	{
 	}
-  /* USER CODE END Error_Handler_Debug */
+	/* USER CODE END Error_Handler_Debug */
 }
 
 #ifdef  USE_FULL_ASSERT
 /**
-  * @brief  Reports the name of the source file and the source line number
-  *         where the assert_param error has occurred.
-  * @param  file: pointer to the source file name
-  * @param  line: assert_param error line source number
-  * @retval None
-  */
+ * @brief  Reports the name of the source file and the source line number
+ *         where the assert_param error has occurred.
+ * @param  file: pointer to the source file name
+ * @param  line: assert_param error line source number
+ * @retval None
+ */
 void assert_failed(char *file, uint32_t line)
 { 
-  /* USER CODE BEGIN 6 */
+	/* USER CODE BEGIN 6 */
 	/* User can add his own implementation to report the file name and line number,
      tex: printf("Wrong parameters value: file %s on line %d\r\n", file, line) */
-  /* USER CODE END 6 */
+	/* USER CODE END 6 */
 }
 #endif /* USE_FULL_ASSERT */
 
