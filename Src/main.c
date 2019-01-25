@@ -83,6 +83,12 @@
 
 #define MAIN_WLAN_PSK "WIFI_PASSWD" /* < Password for Destination SSID */
 
+/** Set WIFI UDP Mode **/
+#define USE_APMODE
+//#define USE_STATIONMODE
+
+//#define USE_CLIENT
+#define USE_SERVER
 
 #define false 0
 #define true 1
@@ -111,7 +117,8 @@
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
 #define MAIN_WIFI_M2M_PRODUCT_NAME        "NMCTemp"
-#define MAIN_WIFI_M2M_SERVER_IP 0xc0a80164 //0xFFFFFFFF /* 255.255.255.255 */
+#define MAIN_WIFI_M2M_BROADCAST_IP 0xFFFFFFFF /* 255.255.255.255 */
+#define MAIN_WIFI_M2M_SERVER_IP  0xc0a80164  //0xc0a80164
 #define MAIN_WIFI_M2M_SERVER_PORT (6666)
 /* USER CODE END PD */
 
@@ -137,6 +144,7 @@ static SOCKET tcp_client_socket = -1;
 static SOCKET udp_socket = -1;
 
 struct sockaddr_in strAddr;
+struct sockaddr_in broadcastAddr;
 
 /** Wi-Fi connection state */
 static volatile uint8_t wifi_connected;
@@ -161,11 +169,11 @@ typedef struct s_msg_wifi_product_main {
 
 /** Message format declarations. */
 static t_msg_wifi_product msg_wifi_product = {
-	.name = MAIN_WIFI_M2M_PRODUCT_NAME,
+		.name = MAIN_WIFI_M2M_PRODUCT_NAME,
 };
 
 static t_msg_wifi_product_main msg_wifi_product_main = {
-	.name = MAIN_WIFI_M2M_PRODUCT_NAME,
+		.name = MAIN_WIFI_M2M_PRODUCT_NAME,
 };
 
 /** Buffer for wifi password */
@@ -443,17 +451,11 @@ void udpClientStart(char *pcServerIP, uint16_t port)
 		len = strlen(txBuffer);
 
 		sendto(udp_socket, txBuffer, len, 0, (struct sockaddr*)&strAddr,
-				sizeof(struct sockaddr_in));
-
-		/*rxLen = recvfrom(udp_socket, rxBuffer, sizeof(rxBuffer), 0);
-
-		if (rxLen > 0)
-		{
-			rxBuffer[rxLen] = '\0';
-			UART_Send_Str(&huart2, "Message received: ");
-			UART_Send_Str(&huart2, rxBuffer);
-			UART_Send_Str(&huart2, "\n\r");
-		}*/
+				sizeof(strAddr));
+	}
+	else
+	{
+		UART_Send_Str(&huart2, "Failed to create client socket\n\r");
 	}
 }
 
@@ -497,7 +499,7 @@ void udpServerSocketEventHandler(SOCKET sock, uint8 u8Msg, void * pvMsg)
 		if((pstrRecvMsg->pu8Buffer != NULL) && (pstrRecvMsg->s16BufferSize > 0))
 		{
 			char remote_addr[16];
-			inet_ntop4((unsigned char*)&pstrRecvMsg->strRemoteAddr.sin_addr, &remote_addr, 16);
+			inet_ntop4((unsigned char*)&pstrRecvMsg->strRemoteAddr.sin_addr, (char*)&remote_addr, 16);
 
 			// Handle received data.
 			UART_Send_Str(&huart2, "Message received from ");
@@ -509,14 +511,17 @@ void udpServerSocketEventHandler(SOCKET sock, uint8 u8Msg, void * pvMsg)
 			uint16 len;
 
 			// Fill in the txBuffer with some data
-			txBuffer[0] = 0;
-			txBuffer[1] = 1;
-			txBuffer[2] = 2;
-			len = 3;
+			strcpy(txBuffer, "Ack");
 
 			// Send some data to the same address.
-			sendto(udp_socket, txBuffer, len, 0,
+			sendto(udp_socket, txBuffer, strlen(txBuffer), 0,
 					&pstrRecvMsg->strRemoteAddr, sizeof(pstrRecvMsg->strRemoteAddr));
+
+			/*sendto(udp_socket, txBuffer, strlen(txBuffer), 0, (struct sockaddr*)&broadcastAddr,
+							sizeof(struct sockaddr_in));*/
+
+			send(udp_socket, txBuffer, strlen(txBuffer), 0);
+
 			// call Recv
 			recvfrom(udp_socket, rxBuffer, sizeof(rxBuffer), 0);
 
@@ -542,7 +547,7 @@ void udpStartServer(uint16 u16ServerPort)
 	{
 		strAddr.sin_family = AF_INET;
 		strAddr.sin_port = _htons(u16ServerPort);
-		strAddr.sin_addr.s_addr = _htonl(MAIN_WIFI_M2M_SERVER_IP); //INADDR_ANY
+		strAddr.sin_addr.s_addr = _htonl(MAIN_WIFI_M2M_BROADCAST_IP); //INADDR_ANY
 
 		int ret = bind(udp_socket, (struct sockaddr*)&strAddr, sizeof(struct sockaddr_in));
 
@@ -637,13 +642,16 @@ int main(void)
 		UART_Send_Str(&huart2, "WINC1500 Wifi Initialized\n\r");
 	}
 
+	broadcastAddr.sin_family = AF_INET;
+	broadcastAddr.sin_port = _htons(MAIN_WIFI_M2M_SERVER_PORT);
+	broadcastAddr.sin_addr.s_addr = _htonl(MAIN_WIFI_M2M_SERVER_IP);
 
 
+#if (defined USE_STATIONMODE)
 	// Start Connect
-	//ret = m2m_wifi_connect((char *)MAIN_WLAN_SSID, sizeof(MAIN_WLAN_SSID), MAIN_WLAN_AUTH,
-	//		(char *)MAIN_WLAN_PSK, 1);
-	//ret = wincStartConnect("SimonsWifix", M2M_WIFI_SEC_OPEN, NULL, 6);
-
+	ret = m2m_wifi_connect((char *)MAIN_WLAN_SSID, sizeof(MAIN_WLAN_SSID), MAIN_WLAN_AUTH,
+			(char *)MAIN_WLAN_PSK, 1);
+#elif (defined USE_APMODE)
 	tstrM2MAPConfig apConfig;
 	strcpy(apConfig.au8SSID, "WINC1500_AP"); // Set SSID
 	apConfig.u8SsidHide = SSID_MODE_VISIBLE; // Set SSID to be broadcasted
@@ -651,13 +659,14 @@ int main(void)
 	apConfig.u8SecType = MAIN_WLAN_AUTH; // Set Security to OPEN
 
 	// IP Address
-	apConfig.au8DHCPServerIP[0] = 192;
-	apConfig.au8DHCPServerIP[1] = 168;
-	apConfig.au8DHCPServerIP[2] = 1;
-	apConfig.au8DHCPServerIP[3] = 100;
+	apConfig.au8DHCPServerIP[0] = 255;
+	apConfig.au8DHCPServerIP[1] = 255;
+	apConfig.au8DHCPServerIP[2] = 255;
+	apConfig.au8DHCPServerIP[3] = 255;
 
 	// Start AP mode
 	ret = m2m_wifi_enable_ap(&apConfig);
+#endif
 
 	if (ret != M2M_SUCCESS)
 	{
@@ -673,10 +682,11 @@ int main(void)
 	nm_bsp_sleep(10000);
 
 	// Initialize socket
-	udpClientStart((char*)0xc0a80164, MAIN_WIFI_M2M_SERVER_PORT);
-
-	//udpStartServer(MAIN_WIFI_M2M_SERVER_PORT);
-
+#if (defined USE_CLIENT)
+	udpClientStart((char*)MAIN_WIFI_M2M_SERVER_IP, MAIN_WIFI_M2M_SERVER_PORT);
+#elif (defined USE_SERVER)
+	udpStartServer(MAIN_WIFI_M2M_SERVER_PORT);
+#endif
 
 
 	/* USER CODE END 2 */
@@ -686,31 +696,41 @@ int main(void)
 	while (1)
 	{
 		m2m_wifi_handle_events(NULL);
+#ifdef USE_CLIENT
+		if (arefCount == 10)
+		{
+			close(udp_socket);
+			udp_socket = -1;
+			UART_Send_Str(&huart2, "UDP Test Complete\n\r");
+			break;
+		}
 
 		HAL_Delay(1000);
-
-		arefCount++;
 
 		strcpy(txBuffer, "HejAref");
 		int len = strlen(txBuffer);
 		ret = sendto(udp_socket, txBuffer, len, 0, (struct sockaddr*)&strAddr,
-						sizeof(struct sockaddr_in));
+				sizeof(struct sockaddr_in));
 		ret = sendto(udp_socket, &msg_wifi_product, sizeof(t_msg_wifi_product), 0, (struct sockaddr*)&strAddr,
 				sizeof(struct sockaddr_in));
 		if (ret == M2M_SUCCESS)
 		{
+			arefCount++;
 			UART_Send_Str(&huart2, "Message sent\n\r");
 		}
 		else
 		{
 			UART_Send_Str(&huart2, "Failed to send message\n\r");
 		}
+#endif
 
 		/* USER CODE END WHILE */
 
 		/* USER CODE BEGIN 3 */
 
 	}
+
+	return 0;
 	/* USER CODE END 3 */
 }
 
