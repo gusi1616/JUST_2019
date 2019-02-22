@@ -25,9 +25,14 @@ void UART_Send_Hex(UART_HandleTypeDef *huart, int16_t intIn)
 	itoa(intIn, intOut, 16);
 	HAL_UART_Transmit(huart, intOut, strlen(intOut), 100);
 }
-void UART_Send_Str(UART_HandleTypeDef *huart, char *str)
+void UART_Send_Str(UART_HandleTypeDef *huart, const char *fmt, ...)
 {
-	HAL_UART_Transmit(huart, str, strlen(str), 100);
+	/*char buffer[500];
+	va_list args;
+	va_start(args, fmt);
+	vsnprintf(buffer, sizeof(buffer), fmt, args);
+	va_end(args);
+	HAL_UART_Transmit(huart, buffer, strlen(buffer), 100);*/
 }
 void UART_Send_Cmd(UART_HandleTypeDef *huart, char *cmd)
 {

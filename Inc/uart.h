@@ -9,6 +9,7 @@
 #define UART_H_
 
 #include "stm32l4xx_hal.h"
+//#include <stdio.h>
 
 
 #define ASCII_CLEAR "\033[2J"
@@ -21,7 +22,7 @@
 void UART_Terminal_Init(UART_HandleTypeDef *huart);
 void UART_Send_Int(UART_HandleTypeDef *huart, int16_t intIn);
 void UART_Send_Hex(UART_HandleTypeDef *huart, int16_t intIn);
-void UART_Send_Str(UART_HandleTypeDef *huart, char *str);
+void UART_Send_Str(UART_HandleTypeDef *huart, const char *fmt, ...);
 void UART_Send_Cmd(UART_HandleTypeDef *huart, char *cmd);
 void UART_Send_IntAndStr(UART_HandleTypeDef *huart, int16_t intIn, char *str);
 void UART_Clear_Terminal(UART_HandleTypeDef *huart);
