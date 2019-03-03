@@ -54,7 +54,15 @@
 #include "driver/m2m_periph.h"
 #include "bsp/nm_bsp_stm32.h"
 #include "uart.h"
+/* USER CODE END Includes */
 
+/* Private typedef -----------------------------------------------------------*/
+/* USER CODE BEGIN PTD */
+
+/* USER CODE END PTD */
+
+/* Private define ------------------------------------------------------------*/
+/* USER CODE BEGIN PD */
 /** Security mode Supported */
 //#define USE_WPAPSK 1 /* WPA/WPA2 PSK Security Mode*/
 // #define USE_WEP 2 /* WEP Security Mode*/
@@ -78,7 +86,8 @@
 
 /** Set CAR or SUPPORT **/
 //#define SOLAR_CAR
-#define SUPPORT_CAR
+//#define SUPPORT_CAR
+#define GPS_TEST
 
 #if (defined SOLAR_CAR)
 #define WIFI_ON 1
@@ -90,7 +99,12 @@
 #define CAN_ON 0
 #define USE_APMODE /** Set WIFI Mode **/
 #define USE_SERVER /** Set UDP Mode **/
+#elif (defined GPS_TEST)
+#define WIFI_ON 0
+#define CAN_ON 0
+#define GPS_ON 1
 #endif
+
 
 /** Set Debug Mode **/
 #define DEBUG 1
@@ -113,22 +127,13 @@
 #define MOTOR_CAN_REQ_FRAME_0 1
 #define MOTOR_CAN_REQ_FRAME_1 2
 #define MOTOR_CAN_REQ_FRAME_2 4
-
-
-/* USER CODE END Includes */
-
-/* Private typedef -----------------------------------------------------------*/
-/* USER CODE BEGIN PTD */
-
-/* USER CODE END PTD */
-
-/* Private define ------------------------------------------------------------*/
-/* USER CODE BEGIN PD */
 #define MAIN_WIFI_M2M_BROADCAST_IP 0xFFFFFFFF /* 255.255.255.255 */
 #define MAIN_WIFI_M2M_CLIENT_IP  0xc0a80164  // 192.168.1.100
 #define MAIN_WIFI_M2M_CLIENT_IP_ALT 0xc0a80184 // 192.168.1.132
 #define MAIN_WIFI_M2M_SERVER_IP  0xC0A80101  // 192.168.1.1
 #define MAIN_WIFI_M2M_SERVER_PORT (6666)
+
+#define UART_BUFFER_SIZE 1
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -157,12 +162,14 @@ struct sockaddr_in broadcastAddr;
 
 /** Wi-Fi connection state */
 static volatile uint8_t wifi_connected;
-sint8 global_rssi;
+int8_t global_rssi;
 
 /** Receive buffer definition. */
 uint8_t rxBuffer[256], txBuffer[256];
+uint8_t uart3RxBuffer[UART_BUFFER_SIZE], uart3TxBuffer[UART_BUFFER_SIZE];
+uint8_t uart3RxITFlag = 0;
 
-int result = 0;
+int8_t result = 0;
 
 CAN_FilterTypeDef sFilterConfig;
 CAN_TxHeaderTypeDef TxHeader;
@@ -216,7 +223,6 @@ static void wifi_cb(uint8_t u8MsgType, void *pvMsg)
 					(char *)MAIN_WLAN_PSK, 1);
 #endif
 		}
-
 		break;
 	}
 
@@ -357,7 +363,7 @@ static const char *inet_ntop4(const unsigned char *src, char *dst, size_t size)
 	return (dst);
 }
 
-void udpServerSocketEventHandler(SOCKET sock, uint8 u8Msg, void * pvMsg)
+void udpServerSocketEventHandler(SOCKET sock, uint8 u8Msg, void *pvMsg)
 {
 	if(u8Msg == SOCKET_MSG_BIND)
 	{
@@ -792,14 +798,17 @@ int main(void)
 	// Wait for connection
 	nm_bsp_sleep(10000);
 #endif
+
+	HAL_UART_Receive_IT(&huart3, uart3RxBuffer, UART_BUFFER_SIZE);
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
 	while (1)
 	{
+#if WIFI_ON
 		m2m_wifi_handle_events(NULL);
-
+#endif
 #ifdef USE_CLIENT
 
 		// Clear txBuffer
@@ -828,7 +837,11 @@ int main(void)
 
 		nm_bsp_sleep(1000);
 #endif
-
+	if (uart3RxITFlag == 1)
+	{
+		uart3RxITFlag = 0;
+		debug("%s", uart3RxBuffer);
+	}
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
@@ -1097,7 +1110,7 @@ static void MX_USART3_UART_Init(void)
 
   /* USER CODE END USART3_Init 1 */
   huart3.Instance = USART3;
-  huart3.Init.BaudRate = 38400;
+  huart3.Init.BaudRate = 9600;
   huart3.Init.WordLength = UART_WORDLENGTH_8B;
   huart3.Init.StopBits = UART_STOPBITS_1;
   huart3.Init.Parity = UART_PARITY_NONE;
@@ -1190,6 +1203,14 @@ void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef *hcan)
 	HAL_CAN_GetRxMessage(&hcan1, CAN_RX_FIFO0, &RxHeader, RxData);
 	Can_Extract_Data(RxHeader.ExtId);
 	//debug("CAN Message Received: 0x%x%x%x%x%x%x%x%x \r\n", RxData[0], RxData[1], RxData[2], RxData[3], RxData[4], RxData[5], RxData[6], RxData[7]);
+}
+void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
+{
+	if (huart == &huart3)
+	{
+		uart3RxITFlag = 1;
+		HAL_UART_Receive_IT(&huart3, uart3RxBuffer, UART_BUFFER_SIZE);
+	}
 }
 
 /* USER CODE END 4 */
