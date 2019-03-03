@@ -70,6 +70,8 @@ extern "C" {
 
 /* USER CODE END EM */
 
+void HAL_TIM_MspPostInit(TIM_HandleTypeDef *htim);
+
 /* Exported functions prototypes ---------------------------------------------*/
 void Error_Handler(void);
 
@@ -86,6 +88,10 @@ void Error_Handler(void);
 #define USART_RX_GPIO_Port GPIOA
 #define LD2_Pin GPIO_PIN_5
 #define LD2_GPIO_Port GPIOA
+#define GPS_DIR_Pin GPIO_PIN_13
+#define GPS_DIR_GPIO_Port GPIOB
+#define GPS_ODOMETER_Pin GPIO_PIN_14
+#define GPS_ODOMETER_GPIO_Port GPIOB
 #define WINC_CS_Pin GPIO_PIN_6
 #define WINC_CS_GPIO_Port GPIOC
 #define WINC_EN_Pin GPIO_PIN_7
