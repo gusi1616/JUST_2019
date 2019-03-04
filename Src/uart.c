@@ -11,7 +11,6 @@
 void UART_Terminal_Init(UART_HandleTypeDef *huart)
 {
 	UART_Clear_Terminal(huart);
-	UART_Send_Str(huart, "Hello and welcome to this lab4!\n\r");
 }
 void UART_Send_Int(UART_HandleTypeDef *huart, int16_t intIn)
 {

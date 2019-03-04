@@ -44,6 +44,8 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include <stdio.h>
+#include <stdarg.h>
+#include "uart.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -53,7 +55,7 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-
+#define DEBUG 1
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -89,6 +91,19 @@ static void MX_ADC1_Init(void);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
+void debug(char *fmt, ...)
+{
+	if (DEBUG)
+	{
+		char buffer[500];
+		va_list args;
+		va_start(args, fmt);
+		vsnprintf(buffer, sizeof(buffer), fmt, args);
+		va_end(args);
+		HAL_UART_Transmit(&huart2, buffer, strlen(buffer), 100);
+	}
+}
+
 void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef *hadc1)
 {
 	spill_adc_value = HAL_ADC_GetValue(hadc1);
@@ -101,6 +116,7 @@ void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef *hadc1)
 
 	HAL_ADC_Start_IT(hadc1); // Restart ADC1 Interrupt
 }
+
 /* USER CODE END 0 */
 
 /**
