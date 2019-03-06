@@ -85,8 +85,8 @@
 #define MAIN_WLAN_PSK "WIFI_PASSWD" /* < Password for Destination SSID */
 
 /** Set CAR or SUPPORT **/
-#define SOLAR_CAR
-//#define SUPPORT_CAR
+//#define SOLAR_CAR
+#define SUPPORT_CAR
 //#define GPS_TEST
 
 #if (defined SOLAR_CAR)
@@ -107,7 +107,7 @@
 
 
 /** Set Debug Mode **/
-#define DEBUG 1
+#define DEBUG 0
 
 #define false 0
 #define true 1
@@ -395,8 +395,8 @@ void udpServerSocketEventHandler(SOCKET sock, uint8 u8Msg, void *pvMsg)
 			// Handle received data.
 			debug("Message received from %s: %s\r\n", remote_addr, rxBuffer);
 
-			/*UART_Send_Cmd(&huart2, rxBuffer);
-			UART_Send_Cmd(&huart2, "\r\n");*/
+			HAL_UART_Transmit(&huart2, rxBuffer, 17, 100);
+			//UART_Send_Cmd(&huart2, "\r\n");
 
 			// Clear txBuffer
 			memset(txBuffer,0,sizeof(txBuffer));
@@ -715,8 +715,8 @@ int main(void)
 	TxData[7] = 0;
 #endif
 
-	UART_Send_Cmd(&huart2, ASCII_CLEAR);
-	UART_Send_Cmd(&huart2, ASCII_HOME);
+	debug("%s", ASCII_CLEAR);
+	debug("%s", ASCII_HOME);
 	debug("Device start\r");
 
 #if WIFI_ON
@@ -799,7 +799,7 @@ int main(void)
 	nm_bsp_sleep(10000);
 #endif
 
-	HAL_UART_Receive_IT(&huart3, uart3RxBuffer, UART_BUFFER_SIZE);
+	//HAL_UART_Receive_IT(&huart3, uart3RxBuffer, UART_BUFFER_SIZE);
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -812,15 +812,15 @@ int main(void)
 #ifdef USE_CLIENT
 
 		// Clear txBuffer
-		memset(txBuffer,0,sizeof(txBuffer));
+		/*memset(txBuffer,0,sizeof(txBuffer));
 
 		// Fill in the txBuffer with some data
 		strcpy((char *)txBuffer, "Alive");
 
 		sendto(udp_socket, (void *)txBuffer, strlen(txBuffer), 0, (struct sockaddr*)&strAddr,
-				sizeof(strAddr));
+				sizeof(strAddr));*/
 
-		m2m_wifi_req_curr_rssi();
+		//m2m_wifi_req_curr_rssi();
 
 		HAL_Delay(50);
 
@@ -828,14 +828,38 @@ int main(void)
 		memset(txBuffer,0,sizeof(txBuffer));
 
 		// Fill in the txBuffer with some data
-		sprintf(txBuffer, "Signal: %d", global_rssi);
+		//sprintf(txBuffer, "Signal: %d", global_rssi);
+		//sprintf(txBuffer, "0x00123011088502457e82040f9120003e");
+		txBuffer[0] = 0x00;
+		txBuffer[1] = 0x12;
+		txBuffer[2] = 0x30;
+		txBuffer[3] = 0x11;
+		txBuffer[4] = 0x08;
+		txBuffer[5] = 0x85;
+		txBuffer[6] = 0x02;
+		txBuffer[7] = 0x45;
+		txBuffer[8] = 0x7e;
+		txBuffer[9] = 0x82;
+		txBuffer[10] = 0x04;
+		txBuffer[11] = 0x0f;
+		txBuffer[12] = 0x91;
+		txBuffer[13] = 0x20;
+		txBuffer[14] = 0x00;
+		txBuffer[15] = 0x3e;
+		txBuffer[16] = 0x100 - ((txBuffer[0] + txBuffer[1] + txBuffer[2] + txBuffer[3] +
+				txBuffer[4] + txBuffer[5] + txBuffer[6] + txBuffer[7] + txBuffer[8] +
+				txBuffer[9] + txBuffer[10] + txBuffer[11] + txBuffer[12] + txBuffer[13] +
+				txBuffer[14] + txBuffer[15]) % 0x100);
 
-		sendto(udp_socket, (void *)txBuffer, strlen(txBuffer), 0, (struct sockaddr*)&strAddr,
+
+		sendto(udp_socket, (void *)txBuffer, 17, 0, (struct sockaddr*)&strAddr,
 				sizeof(strAddr));
 
-		HAL_CAN_AddTxMessage(&hcan1, &TxHeader, TxData, &TxMailbox);
+		debug("UDP Sent\r\n");
 
-		nm_bsp_sleep(1000);
+		//HAL_CAN_AddTxMessage(&hcan1, &TxHeader, TxData, &TxMailbox);
+
+		//nm_bsp_sleep(1000);
 #endif
 	if (uart3RxITFlag == 1)
 	{
