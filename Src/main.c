@@ -87,7 +87,8 @@
 /** Set CAR or SUPPORT **/
 //#define SOLAR_CAR
 //#define SUPPORT_CAR
-#define GPS_TEST
+//#define GPS_TEST
+#define BMS_TEST
 
 #if (defined SOLAR_CAR)
 #define WIFI_ON 1
@@ -103,6 +104,10 @@
 #define WIFI_ON 0
 #define CAN_ON 0
 #define GPS_ON 1
+#elif (defined BMS_TEST)
+#define WIFI_ON 0
+#define CAN_ON 1
+#define GPS_ON 0
 #endif
 
 
@@ -128,9 +133,9 @@
 #define MOTOR_CAN_REQ_FRAME_1 2
 #define MOTOR_CAN_REQ_FRAME_2 4
 
-#define BMS_CAN_RESP_FRAME_1_ID 0x100
-#define BMS_CAN_RESP_FRAME_2_ID 0x200
-#define BMS_CAN_RESP_FRAME_3_ID 0x300
+#define BMS_CAN_RESP_FRAME_1_ID 0x200
+#define BMS_CAN_RESP_FRAME_2_ID 0x300
+#define BMS_CAN_RESP_FRAME_3_ID 0x400
 
 #define BMS_CAN_REQ_FRAME_1_ID 0x180
 #define BMS_CAN_REQ_FRAME_2_ID 0x280
@@ -714,7 +719,7 @@ int main(void)
 	}
 
 	// Fill CAN TxHeader and TxData
-	TxHeader.StdId = 0x321;
+	TxHeader.StdId = BMS_CAN_RESP_FRAME_1_ID | 0x001;
 	TxHeader.ExtId = MOTOR_CAN_REQ_EXT_ID;
 	TxHeader.RTR = CAN_RTR_DATA;
 	TxHeader.IDE = CAN_ID_EXT;
@@ -821,6 +826,7 @@ int main(void)
   /* USER CODE BEGIN WHILE */
 	while (1)
 	{
+
 #if WIFI_ON
 		m2m_wifi_handle_events(NULL);
 #endif
@@ -847,11 +853,11 @@ int main(void)
 
 		sendto(udp_socket, (void *)txBuffer, strlen(txBuffer), 0, (struct sockaddr*)&strAddr,
 				sizeof(strAddr));
-
+#endif
 		HAL_CAN_AddTxMessage(&hcan1, &TxHeader, TxData, &TxMailbox);
 
 		nm_bsp_sleep(1000);
-#endif
+
 	if (uart3RxITFlag == 1)
 	{
 		uart3RxITFlag = 0;
@@ -1220,7 +1226,7 @@ static void MX_GPIO_Init(void)
 /* USER CODE BEGIN 4 */
 void HAL_CAN_TxMailbox0CompleteCallback(CAN_HandleTypeDef *hcan)
 {
-	//debug("CAN Request Sent\r\n");
+	debug("CAN Request Sent\r\n");
 	time_stamp = HAL_CAN_GetTxTimestamp(hcan, TxMailbox);
 }
 void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef *hcan)
