@@ -85,9 +85,9 @@
 #define MAIN_WLAN_PSK "WIFI_PASSWD" /* < Password for Destination SSID */
 
 /** Set CAR or SUPPORT **/
-//#define SOLAR_CAR
+#define SOLAR_CAR
 //#define SUPPORT_CAR
-#define GPS_TEST
+//#define GPS_TEST
 
 #if (defined SOLAR_CAR)
 #define WIFI_ON 1
