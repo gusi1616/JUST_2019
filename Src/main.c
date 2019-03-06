@@ -90,8 +90,8 @@
 //#define GPS_TEST
 
 #if (defined SOLAR_CAR)
-#define WIFI_ON 1
-#define CAN_ON 0
+#define WIFI_ON 0
+#define CAN_ON 1
 #define USE_STATIONMODE /** Set WIFI Mode **/
 #define USE_CLIENT /** Set UDP Mode **/
 #elif (defined SUPPORT_CAR)
@@ -799,7 +799,7 @@ int main(void)
 	nm_bsp_sleep(10000);
 #endif
 
-	HAL_UART_Receive_IT(&huart3, uart3RxBuffer, UART_BUFFER_SIZE);
+	//HAL_UART_Receive_IT(&huart3, uart3RxBuffer, UART_BUFFER_SIZE);
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -1205,7 +1205,7 @@ static void MX_GPIO_Init(void)
 /* USER CODE BEGIN 4 */
 void HAL_CAN_TxMailbox0CompleteCallback(CAN_HandleTypeDef *hcan)
 {
-	//debug("CAN Request Sent\r\n");
+	debug("CAN Request Sent\r\n");
 	time_stamp = HAL_CAN_GetTxTimestamp(hcan, TxMailbox);
 }
 void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef *hcan)
