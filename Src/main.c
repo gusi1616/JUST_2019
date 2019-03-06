@@ -127,6 +127,15 @@
 #define MOTOR_CAN_REQ_FRAME_0 1
 #define MOTOR_CAN_REQ_FRAME_1 2
 #define MOTOR_CAN_REQ_FRAME_2 4
+
+#define BMS_CAN_RESP_FRAME_1_ID 0x100
+#define BMS_CAN_RESP_FRAME_2_ID 0x200
+#define BMS_CAN_RESP_FRAME_3_ID 0x300
+
+#define BMS_CAN_REQ_FRAME_1_ID 0x180
+#define BMS_CAN_REQ_FRAME_2_ID 0x280
+#define BMS_CAN_REQ_FRAME_3_ID 0x380
+
 #define MAIN_WIFI_M2M_BROADCAST_IP 0xFFFFFFFF /* 255.255.255.255 */
 #define MAIN_WIFI_M2M_CLIENT_IP  0xc0a80164  // 192.168.1.100
 #define MAIN_WIFI_M2M_CLIENT_IP_ALT 0xc0a80184 // 192.168.1.132
@@ -180,8 +189,14 @@ uint32_t TxMailbox;
 
 uint32_t time_stamp;
 
+/** Motor controller variables */
 uint16_t BatteryVoltage, BatteryCurrent, BatCurDir, MotorCurPeakAvg, FetTemp, MotorRotSpeed, PWM;
 uint16_t PowerMode, MotorControlMode, AcceleratorPosition, RegenerationVrPosition, DigitSwPosition, OutputTargetValue, DriveActionStatus, RegenerationStatus;
+
+/** BMS variables */
+uint8_t BmsMinVoltage, BmsMaxVoltage;
+uint16_t BmsVoltage, BmsCurrent, BmsMinTemp, BmsMaxTemp;
+
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -799,7 +814,7 @@ int main(void)
 	nm_bsp_sleep(10000);
 #endif
 
-	HAL_UART_Receive_IT(&huart3, uart3RxBuffer, UART_BUFFER_SIZE);
+	//HAL_UART_Receive_IT(&huart3, uart3RxBuffer, UART_BUFFER_SIZE);
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -1211,8 +1226,8 @@ void HAL_CAN_TxMailbox0CompleteCallback(CAN_HandleTypeDef *hcan)
 void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef *hcan)
 {
 	HAL_CAN_GetRxMessage(&hcan1, CAN_RX_FIFO0, &RxHeader, RxData);
-	Can_Extract_Data(RxHeader.ExtId);
-	//debug("CAN Message Received: 0x%x%x%x%x%x%x%x%x \r\n", RxData[0], RxData[1], RxData[2], RxData[3], RxData[4], RxData[5], RxData[6], RxData[7]);
+	//Can_Extract_Data(RxHeader.ExtId);
+	debug("CAN Message Received: 0x%x%x%x%x%x%x%x%x \r\n", RxData[0], RxData[1], RxData[2], RxData[3], RxData[4], RxData[5], RxData[6], RxData[7]);
 }
 void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 {
