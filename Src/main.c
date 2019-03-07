@@ -719,13 +719,13 @@ int main(void)
 	}
 
 	// Fill CAN TxHeader and TxData
-	TxHeader.StdId = BMS_CAN_RESP_FRAME_1_ID | 0x001;
+	TxHeader.StdId = BMS_CAN_REQ_FRAME_1_ID | 0x001;
 	TxHeader.ExtId = MOTOR_CAN_REQ_EXT_ID;
 	TxHeader.RTR = CAN_RTR_DATA;
-	TxHeader.IDE = CAN_ID_EXT;
+	TxHeader.IDE = CAN_ID_STD;
 	TxHeader.DLC = 1;
 	TxHeader.TransmitGlobalTime = DISABLE;
-	TxData[0] = MOTOR_CAN_REQ_FRAME_0 | MOTOR_CAN_REQ_FRAME_1 | MOTOR_CAN_REQ_FRAME_2;
+	TxData[0] = 0; //MOTOR_CAN_REQ_FRAME_0 | MOTOR_CAN_REQ_FRAME_1 | MOTOR_CAN_REQ_FRAME_2;
 	TxData[1] = 0;
 	TxData[2] = 0;
 	TxData[3] = 0;
