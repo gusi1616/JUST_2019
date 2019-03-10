@@ -17,11 +17,15 @@
 #include "driver/m2m_wifi.h"
 #include "stm32l4xx_hal.h"
 
-/*
-#include "WiFiClient.h"
-#include "WiFiSSLClient.h"
-#include "WiFiServer.h"
-*/
+/** IP Addresses */
+#define MAIN_WIFI_M2M_BROADCAST_IP 0xFFFFFFFF /* 255.255.255.255 */
+#define MAIN_WIFI_M2M_CLIENT_IP  0xc0a80164  // 192.168.1.100
+#define MAIN_WIFI_M2M_CLIENT_IP_ALT 0xc0a80184 // 192.168.1.132
+#define MAIN_WIFI_M2M_SERVER_IP  0xC0A80101  // 192.168.1.1
+#define MAIN_WIFI_M2M_SERVER_PORT (6666)
+
+/** Max size of incoming packets */
+#define MAIN_WIFI_M2M_BUFFER_SIZE		20
 
 typedef enum {
 	WL_NO_SHIELD = 255,

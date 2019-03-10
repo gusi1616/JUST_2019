@@ -109,29 +109,8 @@
 /** Set Debug Mode **/
 #define DEBUG 1
 
-#define false 0
-#define true 1
-
 /** Port to use for UDP socket */
 #define UDP_PORT                       (6666)
-
-/** Max size of incoming packets */
-#define MAIN_WIFI_M2M_BUFFER_SIZE		20
-
-/** CAN ID */
-#define MOTOR_CAN_REQ_EXT_ID 0x08f91540
-#define MOTOR_CAN_RESP_FRAME_0_ID 0x08850245
-#define MOTOR_CAN_RESP_FRAME_1_ID 0x08950245
-#define MOTOR_CAN_RESP_FRAME_2_ID 0x08A50245
-
-#define MOTOR_CAN_REQ_FRAME_0 1
-#define MOTOR_CAN_REQ_FRAME_1 2
-#define MOTOR_CAN_REQ_FRAME_2 4
-#define MAIN_WIFI_M2M_BROADCAST_IP 0xFFFFFFFF /* 255.255.255.255 */
-#define MAIN_WIFI_M2M_CLIENT_IP  0xc0a80164  // 192.168.1.100
-#define MAIN_WIFI_M2M_CLIENT_IP_ALT 0xc0a80184 // 192.168.1.132
-#define MAIN_WIFI_M2M_SERVER_IP  0xC0A80101  // 192.168.1.1
-#define MAIN_WIFI_M2M_SERVER_PORT (6666)
 
 #define UART_BUFFER_SIZE 1
 /* USER CODE END PD */
@@ -154,9 +133,6 @@ UART_HandleTypeDef huart3;
 /* USER CODE BEGIN PV */
 /* Private variables ---------------------------------------------------------*/
 
-/** Sockets for UDP communication */
-static SOCKET udp_socket = -1;
-
 struct sockaddr_in strAddr;
 struct sockaddr_in broadcastAddr;
 
@@ -166,22 +142,12 @@ int8_t global_rssi;
 
 /** Receive buffer definition. */
 uint8_t rxBuffer[256], txBuffer[256];
-uint8_t uart3RxBuffer[UART_BUFFER_SIZE], uart3TxBuffer[UART_BUFFER_SIZE];
+uint8_t GpsRxBuffer[UART_BUFFER_SIZE], GpsTxBuffer[UART_BUFFER_SIZE];
 uint8_t uart3RxITFlag = 0;
 
 int8_t result = 0;
 
-CAN_FilterTypeDef sFilterConfig;
-CAN_TxHeaderTypeDef TxHeader;
-CAN_RxHeaderTypeDef RxHeader;
-uint8_t TxData[8];
-uint8_t RxData[8];
-uint32_t TxMailbox;
-
 uint32_t time_stamp;
-
-uint16_t BatteryVoltage, BatteryCurrent, BatCurDir, MotorCurPeakAvg, FetTemp, MotorRotSpeed, PWM;
-uint16_t PowerMode, MotorControlMode, AcceleratorPosition, RegenerationVrPosition, DigitSwPosition, OutputTargetValue, DriveActionStatus, RegenerationStatus;
 
 char *m2m_wifi_state_string;
 /* USER CODE END PV */
@@ -196,505 +162,21 @@ static void MX_USART3_UART_Init(void);
 static void MX_TIM15_Init(void);
 /* USER CODE BEGIN PFP */
 /* Private function prototypes -----------------------------------------------*/
-void Can_To_UART(void);
-void Can_Extract_Data(uint32_t frameID);
+
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-static void wifi_cb(uint8_t u8MsgType, void *pvMsg)
-{
-	switch (u8MsgType) {
-	case M2M_WIFI_RESP_CON_STATE_CHANGED:
-	{
-		//debug("State: M2M_WIFI_RESP_CON_STATE_CHANGED\r\n");
-		tstrM2mWifiStateChanged *pstrWifiState = (tstrM2mWifiStateChanged *)pvMsg;
-		if (pstrWifiState->u8CurrState == M2M_WIFI_CONNECTED) {
-			debug("\033[H");
-			debug("\033[5B");
-			debug("Wi-Fi Status: Connected\r\n");
-			m2m_wifi_enable_dhcp(0);
-#if (defined USE_STATIONMODE)
-			tstrM2MIPConfig stnConfig;
-			stnConfig.u32StaticIP = _htonl(MAIN_WIFI_M2M_CLIENT_IP_ALT);
-			stnConfig.u32SubnetMask = _htonl(0xFFFFFF00); //corresponds to 255.255.255.0
-			m2m_wifi_set_static_ip(&stnConfig);
-#endif
-		} else if (pstrWifiState->u8CurrState == M2M_WIFI_DISCONNECTED) {
-			debug("\033[H");
-			debug("\033[5B");
-			debug("Wi-Fi Status: Disconnected\r\n");
-#if (defined USE_STATIONMODE)
-			/* Reconnect. */
-			m2m_wifi_connect((char *)MAIN_WLAN_SSID, sizeof(MAIN_WLAN_SSID), MAIN_WLAN_AUTH,
-					(char *)MAIN_WLAN_PSK, 1);
-#endif
-		}
-		break;
-	}
-
-	case M2M_WIFI_REQ_DHCP_CONF:
-	{
-		//debug("State: M2M_WIFI_REQ_DHCP_CONF\r\n");
-		uint8_t *pu8IPAddress = (uint8_t *)pvMsg;
-		debug("\033[H");
-		debug("\033[4B");
-		debug("Wi-Fi configured\r\n");
-#if (defined USE_APMODE)
-		debug("Client IP is %d.%d.%d.%d\r\n", pu8IPAddress[0], pu8IPAddress[1], pu8IPAddress[2], pu8IPAddress[3]);
-#elif (defined USE_STATIONMODE)
-		// Get the current AP info
-		//m2m_wifi_get_connection_info();
-		m2m_wifi_req_curr_rssi();
-#endif
-		// Initialize socket
-#if (defined USE_CLIENT)
-		udpClientStart((char*)MAIN_WIFI_M2M_SERVER_IP, MAIN_WIFI_M2M_SERVER_PORT);
-#elif (defined USE_SERVER)
-		udpStartServer(MAIN_WIFI_M2M_SERVER_PORT);
-#endif
-		break;
-	}
-
-	/*case M2M_WIFI_RESP_IP_CONFIGURED:
-	{
-		debug("State: M2M_WIFI_RESP_IP_CONFIGURED\r\n");
-		uint8_t *pu8IPAddress = (uint8_t *)pvMsg;
-		debug("Wi-Fi RESP IP configured\r\n");
-		debug("Wi-Fi Static IP is %d.%d.%d.%d\r\n", pu8IPAddress[0], pu8IPAddress[1], pu8IPAddress[2], pu8IPAddress[3]);
-		break;
-	}*/
-
-	case M2M_WIFI_RESP_CURRENT_RSSI:
-	{
-		sint8 *rssi = (sint8*)pvMsg;
-		global_rssi = *rssi;
-		debug("\033[H");
-		debug("\033[6B");
-		debug("Signal Strength : %d\n", global_rssi);
-		break;
-	}
-
-	case M2M_WIFI_RESP_CONN_INFO:
-	{
-		tstrM2MConnInfo *pstrConnInfo = (tstrM2MConnInfo*)pvMsg;
-
-		debug("CONNECTED AP INFO\n");
-		debug("SSID : %s\n",pstrConnInfo->acSSID);
-		debug("SEC TYPE : %d\n",pstrConnInfo->u8SecType);
-		debug("Signal Strength : %d\n", pstrConnInfo->s8RSSI);
-		debug("Local IP Address : %d.%d.%d.%d\n", pstrConnInfo->au8IPAddr[0] , pstrConnInfo->au8IPAddr[1], pstrConnInfo->au8IPAddr[2], pstrConnInfo->au8IPAddr[3]);
-
-		UART_Send_Cmd(&huart2, ASCII_HOME);
-		break;
-	}
-
-	default:
-	{
-		break;
-	}
-	}
-}
-
-void udpClientSocketEventHandler(SOCKET sock, uint8 u8Msg, void * pvMsg)
-{
-	if((u8Msg == SOCKET_MSG_RECV) || (u8Msg == SOCKET_MSG_RECVFROM))
-	{
-		debug("State: SOCKET_MSG_RECV\r\n");
-
-		tstrSocketRecvMsg *pstrRecvMsg = (tstrSocketRecvMsg*)pvMsg;
-		if((pstrRecvMsg->pu8Buffer != NULL) && (pstrRecvMsg->s16BufferSize > 0))
-		{
-			uint16 len;
-
-			// Clear txBuffer
-			memset(txBuffer,0,sizeof(txBuffer));
-
-			// Format a message in the txBuffer and put its length in len
-			txBuffer[0] = 0;
-			txBuffer[1] = 1;
-			txBuffer[2] = 2;
-			len = 3;
-
-			// Handle received data.
-			debug("Message received: %s\r\n", rxBuffer);
-
-			//sendto(udp_socket, txBuffer, len, 0,
-			//	(struct sockaddr*)&strAddr, sizeof(struct sockaddr_in));
-
-			recvfrom(udp_socket, rxBuffer, sizeof(rxBuffer), 0);
-		}
-	}
-	else if (u8Msg == SOCKET_MSG_SENDTO)
-	{
-		//debug("CAN Message sent via WiFi\r\n");
-	}
-}
-
-void udpClientStart(char *pcServerIP, uint16_t port)
-{
-	// Register socket application callbacks.
-	registerSocketCallback(udpClientSocketEventHandler, NULL);
-
-	udp_socket = socket(AF_INET, SOCK_DGRAM, 0);
-	if(udp_socket >= 0)
-	{
-		uint16 len;
-		strAddr.sin_family = AF_INET;
-		strAddr.sin_port = _htons(port);
-		strAddr.sin_addr.s_addr = _htonl(MAIN_WIFI_M2M_SERVER_IP); //nmi_inet_addr(pcServerIP);
-
-		// Format some message in the txBuffer and put its length in len
-		strcpy(txBuffer, "Solar Car Connected");
-		len = strlen(txBuffer);
-
-		sendto(udp_socket, (void *)txBuffer, len, 0, (struct sockaddr*)&strAddr,
-				sizeof(strAddr));
-
-		recvfrom(udp_socket, rxBuffer, sizeof(rxBuffer), 0);
-	}
-	else
-	{
-		debug("Failed to create client socket\r\n");
-	}
-}
-
-static const char *inet_ntop4(const unsigned char *src, char *dst, size_t size)
-{
-	static const char fmt[] = "%u.%u.%u.%u";
-	char tmp[sizeof "255.255.255.255"];
-
-	sprintf(tmp, fmt, src[0], src[1], src[2], src[3]);
-	if (strlen(tmp) > size) {
-		return (NULL);
-	}
-	strcpy(dst, tmp);
-	return (dst);
-}
-
-void udpServerSocketEventHandler(SOCKET sock, uint8 u8Msg, void *pvMsg)
-{
-	if(u8Msg == SOCKET_MSG_BIND)
-	{
-		//debug("State: SOCKET_MSG_BIND\r\n");
-
-		tstrSocketBindMsg *pstrBind = (tstrSocketBindMsg*)pvMsg;
-		if(pstrBind->status == 0)
-		{
-			//debug("Bind Success\r\n");
-
-			// call Recv
-			recvfrom(udp_socket, rxBuffer, sizeof(rxBuffer), 0);
-		}
-		else
-		{
-			//debug("Bind Failed\r\n");
-		}
-	}
-	else if(u8Msg == SOCKET_MSG_RECVFROM)
-	{
-		//debug("State: SOCKET_MSG_RECVFROM\r\n");
-
-		tstrSocketRecvMsg *pstrRecvMsg = (tstrSocketRecvMsg*)pvMsg;
-		if((pstrRecvMsg->pu8Buffer != NULL) && (pstrRecvMsg->s16BufferSize > 0))
-		{
-			char remote_addr[16];
-			inet_ntop4((unsigned char*)&pstrRecvMsg->strRemoteAddr.sin_addr, (char*)&remote_addr, 16);
-
-			// Handle received data.
-			//debug("Message received from %s: %s\r\n", remote_addr, rxBuffer);
-
-			Can_To_UART();
-
-			//HAL_UART_Transmit(&huart2, rxBuffer, strlen(rxBuffer), 100);
-			//UART_Send_Cmd(&huart2, "\r\n");
-
-			// Clear txBuffer
-			memset(txBuffer,0,sizeof(txBuffer));
-
-			// Fill in the txBuffer with some data
-			strcpy((char *)txBuffer, "Ack");
-
-			// Send some data to the same address.
-			sendto(udp_socket, txBuffer, strlen(txBuffer), 0,
-					&pstrRecvMsg->strRemoteAddr, sizeof(pstrRecvMsg->strRemoteAddr));
-
-			// call Recv
-			recvfrom(udp_socket, rxBuffer, sizeof(rxBuffer), 0);
-		}
-	}
-}
-
-void udpStartServer(uint16 u16ServerPort)
-{
-	// Register socket application callbacks.
-	registerSocketCallback(udpServerSocketEventHandler, NULL);
-
-	// Create the server listen socket.
-	udp_socket = socket(AF_INET, SOCK_DGRAM, 0);
-	if(udp_socket >= 0)
-	{
-		strAddr.sin_family = AF_INET;
-		strAddr.sin_port = _htons(u16ServerPort);
-		strAddr.sin_addr.s_addr = 0; //INADDR_ANY
-
-		int ret = bind(udp_socket, (struct sockaddr*)&strAddr, sizeof(struct sockaddr_in));
-
-		if (ret == M2M_SUCCESS)
-		{
-			//debug("WINC1500 Wifi Bind Success\r\n");
-		}
-		else
-		{
-			//debug("WINC1500 Wifi Bind Failed\r\n");
-		}
-	}
-}
-
-void spi_dummy_send(void)
-{
-	HAL_SPI_Init(&hspi_winc);
-	HAL_GPIO_WritePin(WINC_CS_GPIO_Port, WINC_CS_Pin, GPIO_PIN_RESET);
-	HAL_Delay(1);
-	HAL_SPI_Transmit(&hspi_winc, 0xFF, 1, 100);
-	HAL_GPIO_WritePin(WINC_CS_GPIO_Port, WINC_CS_Pin, GPIO_PIN_SET);
-}
 
 void debug(char *fmt, ...)
 {
 	if (DEBUG)
 	{
-		char buffer[500];
-		va_list args;
-		va_start(args, fmt);
-		vsnprintf(buffer, sizeof(buffer), fmt, args);
-		va_end(args);
-		HAL_UART_Transmit(&huart2, buffer, strlen(buffer), 100);
+		va_list arglist;
+		UART_Send_Str(&huart2, fmt, arglist);
 	}
 }
 
-void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
-{
-	if(GPIO_Pin==GPIO_PIN_9)
-	{
-		isr();
-	}
-}
-
-void Can_To_UART(void)
-{
-	uint32_t frameID = (rxBuffer[11] << 24) | (rxBuffer[10] << 16) | (rxBuffer[9] << 8) | rxBuffer[8];
-
-	RxData[7] = rxBuffer[7];
-	RxData[6] = rxBuffer[6];
-	RxData[5] = rxBuffer[5];
-	RxData[4] = rxBuffer[4];
-	RxData[3] = rxBuffer[3];
-	RxData[2] = rxBuffer[2];
-	RxData[1] = rxBuffer[1];
-	RxData[0] = rxBuffer[0];
-
-	Can_Extract_data(frameID);
-}
-
-void Can_Extract_Data(uint32_t frameID)
-{
-	UART_Send_Cmd(&huart2, ASCII_HOME);
-	if (frameID == MOTOR_CAN_RESP_FRAME_0_ID)
-	{
-		// Extract the bits
-		BatteryVoltage = ((RxData[1U] & 0x03U) << 8U) | RxData[0U];
-		BatteryCurrent = ((RxData[2U] & 0x07U) << 6U) | ((RxData[1U] & 0xFCU) >> 2U);
-		BatCurDir = (RxData[2U] & 0x08U) >> 3U;
-		MotorCurPeakAvg = ((RxData[3U] & 0x3FU) << 4U) | ((RxData[2U] & 0xF0) >> 4U);
-		FetTemp = ((RxData[4U] & 0x07U) << 2U) | ((RxData[3U] & 0xC0) >> 6U);
-		MotorRotSpeed = ((RxData[5U] & 0x7FU) << 5U) | ((RxData[4U] & 0xF8) >> 3U);
-		PWM = ((RxData[7U] & 0x01U) << 9U) | RxData[6U] << 1U | ((RxData[5U] & 0x80U) >> 7U);
-
-		// Convert to unit if necessary
-		BatteryVoltage /= 2;
-		FetTemp *= 5;
-		PWM /= 2;
-
-		// Print values
-		UART_Send_Cmd(&huart2, "\033[10B");
-
-		debug("Battery Voltage\t\t\t: %04d\r\n", BatteryVoltage);
-		debug("Battery Current\t\t\t: %04d\r\n", BatteryCurrent);
-		debug("Current Direction\t\t: %04d\r\n", BatCurDir);
-		debug("Motor Current Peak Avg\t\t: %04d\r\n", MotorCurPeakAvg);
-		debug("FET Temp\t\t\t: %04d\r\n", FetTemp);
-		debug("Motor Rotation Speed\t\t: %04d\r\n", MotorRotSpeed);
-		debug("PWM\t\t\t\t: %04d\r\n", PWM);
-	}
-	else if (frameID == MOTOR_CAN_RESP_FRAME_1_ID)
-	{
-		// Extract the bits
-		PowerMode = RxData[0] & 0x01U;
-		MotorControlMode = (RxData[0] & 0x02U) >> 1U;
-		AcceleratorPosition = ((RxData[1] & 0x0FU) << 6U) | ((RxData[0] & 0xFCU) >> 2U);
-		RegenerationVrPosition = ((RxData[2] & 0x3FU) << 4U) | ((RxData[1] & 0xF0U) >> 4U);
-		DigitSwPosition = ((RxData[3] & 0x03U) << 2U) | ((RxData[2] & 0xC0U) >> 6U);
-		OutputTargetValue = ((RxData[4] & 0x0FU) << 6U) | ((RxData[3] & 0xFCU) >> 2U);
-		DriveActionStatus = (RxData[4] & 0x30U) >> 4U;
-		RegenerationStatus = (RxData[4] & 0x40U) >> 5U;
-
-		// Convert to unit if necessary
-		AcceleratorPosition /= 2;
-		RegenerationVrPosition /= 2;
-		OutputTargetValue /= 2;
-
-		// Print values
-		UART_Send_Cmd(&huart2, "\033[20B");
-		debug("Power Mode\t\t\t\t: %04d\r\n", PowerMode);
-		debug("Motor Control Mode\t\t\t: %04d\r\n", MotorControlMode);
-		debug("Accelerator Position\t\t\t: %04d\r\n", AcceleratorPosition);
-		debug("Regeneration VR Position\t\t: %04d\r\n", RegenerationVrPosition);
-		debug("Digit SW Position\t\t\t: %04d\r\n", DigitSwPosition);
-		debug("Output Target Value\t\t\t: %04d\r\n", OutputTargetValue);
-		debug("Drive Action Status\t\t\t: %04d\r\n", DriveActionStatus);
-		debug("Regeneration Status\t\t\t: %04d\r\n", RegenerationStatus);
-	}
-	else if (frameID == MOTOR_CAN_RESP_FRAME_2_ID)
-	{
-		uint8_t OverHeatLevel = RxData[4] & 0x03U;
-		uint32_t ErrorBits = RxData[3] | RxData[2] | RxData[1] | RxData[0];
-
-		UART_Send_Cmd(&huart2, "\033[30B");
-		debug("OverHeat Level: %d\r\n", OverHeatLevel);
-
-		if (ErrorBits > 0)
-		{
-			debug("ERROR DETECTED\r\n");
-
-			if (ErrorBits & (2^0))
-			{
-				debug("Analog Sensor Error\r\n");
-			}
-			if (ErrorBits & (2^1))
-			{
-				debug("Motor Current Sensor U Error\r\n");
-			}
-			if (ErrorBits & (2^2))
-			{
-				debug("Motor Current Sensor W Error\r\n");
-			}
-			if (ErrorBits & (2^3))
-			{
-				debug("FET Thermistor Error\r\n");
-			}
-			if (ErrorBits & (2^5))
-			{
-				debug("Battery Voltage Sensor Error\r\n");
-			}
-			if (ErrorBits & (2^6))
-			{
-				debug("Battery Current Sensor Error\r\n");
-			}
-			if (ErrorBits & (2^7))
-			{
-				debug("Battery Current Sensor Adjust Error\r\n");
-			}
-			if (ErrorBits & (2^8))
-			{
-				debug("Motor Current Sensor Adjust Error\r\n");
-			}
-			if (ErrorBits & (2^9))
-			{
-				debug("Accelerator Position Error\r\n");
-			}
-			if (ErrorBits & (2^11))
-			{
-				debug("Controller Voltage Sensor Error\r\n");
-			}
-			if (ErrorBits & (2^16))
-			{
-				debug("Power System Error\r\n");
-			}
-			if (ErrorBits & (2^19))
-			{
-				debug("Over Current Error\r\n");
-			}
-			if (ErrorBits & (2^21))
-			{
-				debug("Over Current Limit\r\n");
-			}
-			if (ErrorBits & (2^24))
-			{
-				debug("Motor System Error\r\n");
-			}
-			if (ErrorBits & (2^25))
-			{
-				debug("Motor Lock\r\n");
-			}
-			if (ErrorBits & (2^26))
-			{
-				debug("Hall Sensor Short\r\n");
-			}
-			if (ErrorBits & (2^27))
-			{
-				debug("Hall Sensor Open\r\n");
-			}
-		}
-		else
-		{
-			debug("NO ERRORS\r\n");
-		}
-	}
-
-#if (defined SOLAR_CAR)
-
-	// Clear txBuffer
-	memset(txBuffer,0,sizeof(txBuffer));
-
-	/*txBuffer[16] = 0x00;
-	txBuffer[15] = 0x12;
-	txBuffer[14] = 0x30;
-	txBuffer[13] = 0x11;
-	txBuffer[12] = RxHeader.ExtId & 0xFF000000 >> 24;
-	txBuffer[11] = RxHeader.ExtId & 0x00FF0000 >> 16;
-	txBuffer[10] = RxHeader.ExtId & 0x0000FF00 >> 8;
-	txBuffer[9] = RxHeader.ExtId & 0x000000FF;
-	txBuffer[8] = RxData[7];
-	txBuffer[7] = RxData[6];
-	txBuffer[6] = RxData[5];
-	txBuffer[5] = RxData[4];
-	txBuffer[4] = RxData[3];
-	txBuffer[3] = RxData[2];
-	txBuffer[2] = RxData[1];
-	txBuffer[1] = RxData[0];
-	txBuffer[0] = 0x100 - ((txBuffer[16] + txBuffer[1] + txBuffer[2] + txBuffer[3] +
-			txBuffer[4] + txBuffer[5] + txBuffer[6] + txBuffer[7] + txBuffer[8] +
-			txBuffer[9] + txBuffer[10] + txBuffer[11] + txBuffer[12] + txBuffer[13] +
-			txBuffer[14] + txBuffer[15]) % 0x100);*/
-
-	txBuffer[11] = RxHeader.ExtId & 0xFF000000 >> 24;
-	txBuffer[10] = RxHeader.ExtId & 0x00FF0000 >> 16;
-	txBuffer[9] = RxHeader.ExtId & 0x0000FF00 >> 8;
-	txBuffer[8] = RxHeader.ExtId & 0x000000FF;
-	txBuffer[7] = RxData[7];
-	txBuffer[6] = RxData[6];
-	txBuffer[5] = RxData[5];
-	txBuffer[4] = RxData[4];
-	txBuffer[3] = RxData[3];
-	txBuffer[2] = RxData[2];
-	txBuffer[1] = RxData[1];
-	txBuffer[0] = RxData[0];
-
-	// Fill txBuffer
-	//snprintf(txBuffer, 34, "0x%08x%08x%02x%02x%02x%02x%02x%02x%02x%02x", time_stamp, RxHeader.ExtId, RxData[0], RxData[1], RxData[2], RxData[3], RxData[4], RxData[5], RxData[6], RxData[7]);
-
-	debug("CAN Message Received: %s\r\n", txBuffer);
-
-	UART_Send_Cmd(&huart2, ASCII_HOME);
-
-	//int len = strlen(txBuffer);
-
-	// Send to wifi
-	sendto(udp_socket, (void *)txBuffer, 12, 0, (struct sockaddr*)&strAddr,
-			sizeof(strAddr));
-#endif
-}
 /* USER CODE END 0 */
 
 /**
@@ -733,122 +215,32 @@ int main(void)
 	/* USER CODE BEGIN 2 */
 
 #if CAN_ON
-	// CAN filter configuration
-	sFilterConfig.FilterBank = 0;
-	sFilterConfig.FilterMode = CAN_FILTERMODE_IDMASK;
-	sFilterConfig.FilterScale = CAN_FILTERSCALE_32BIT;
-	sFilterConfig.FilterIdHigh = 0x0000;
-	sFilterConfig.FilterIdLow = 0x0000;
-	sFilterConfig.FilterMaskIdHigh = 0x0000;
-	sFilterConfig.FilterMaskIdLow = 0x0000;
-	sFilterConfig.FilterFIFOAssignment = CAN_RX_FIFO0;
-	sFilterConfig.FilterActivation = ENABLE;
-	sFilterConfig.SlaveStartFilterBank = 14;
-	if (HAL_CAN_ConfigFilter(&hcan1, &sFilterConfig) != HAL_OK)
-	{
-		/* Filter configuration Error */
-		Error_Handler();
-	}
 
-	if (HAL_CAN_Start(&hcan1) != HAL_OK)
-	{
-		/* Start Error */
-		Error_Handler();
-	}
+	// Configure filter and start CAN
+	CAN_Init();
 
-	if (HAL_CAN_ActivateNotification(&hcan1, CAN_IT_RX_FIFO0_MSG_PENDING | CAN_IT_TX_MAILBOX_EMPTY) != HAL_OK)
-	{
-		/* Notification Error */
-		Error_Handler();
-	}
 
-	// Fill CAN TxHeader and TxData
-	TxHeader.StdId = 0x321;
-	TxHeader.ExtId = MOTOR_CAN_REQ_EXT_ID;
-	TxHeader.RTR = CAN_RTR_DATA;
-	TxHeader.IDE = CAN_ID_EXT;
-	TxHeader.DLC = 1;
-	TxHeader.TransmitGlobalTime = DISABLE;
-	TxData[0] = MOTOR_CAN_REQ_FRAME_0 | MOTOR_CAN_REQ_FRAME_1 | MOTOR_CAN_REQ_FRAME_2;
-	TxData[1] = 0;
-	TxData[2] = 0;
-	TxData[3] = 0;
-	TxData[4] = 0;
-	TxData[5] = 0;
-	TxData[6] = 0;
-	TxData[7] = 0;
+
 #endif
 
-	debug("%s", ASCII_CLEAR);
-	debug("%s", ASCII_HOME);
+	debug(ASCII_CLEAR);
+	debug(ASCII_HOME);
 	debug("Device start\r");
 
 #if WIFI_ON
-	// Init SPI with dummy byte
-	spi_dummy_send();
-
 	// Init WINC1500
-	/*if (wincInit() != M2M_SUCCESS)
+	if (wincInit() != M2M_SUCCESS)
 	{
-		result = M2M_ERR_INIT;
-	}*/
-
-	tstrWifiInitParam param;
-	int8_t ret;
-
-	// Initialize the WiFi BSP:
-	nm_bsp_init();
-
-	// Initialize WiFi parameters structure
-	m2m_memset((uint8*)&param, 0, sizeof(param));
-	param.pfAppWifiCb = wifi_cb;
-
-	// Initialize WiFi module and register status callback:
-	ret = m2m_wifi_init(&param);
-	if (M2M_SUCCESS != ret && M2M_ERR_FW_VER_MISMATCH != ret) {
-		debug("WINC1500 Wifi Initialization failed\r\n");
+		ret = M2M_ERR_INIT;
 	}
-	else
-	{
-		debug("WINC1500 Wifi Initialized\r\n");
-	}
-
-	// Initialize the socket layer.
-	socketInit();
-
-	// Configure broadcast struct.
-	broadcastAddr.sin_family = AF_INET;
-	broadcastAddr.sin_port = _htons(MAIN_WIFI_M2M_SERVER_PORT);
-	broadcastAddr.sin_addr.s_addr = _htonl(MAIN_WIFI_M2M_BROADCAST_IP);
-
-
 #if (defined USE_STATIONMODE)
 	// Start Connect
-	ret = m2m_wifi_connect((char *)MAIN_WLAN_SSID, sizeof(MAIN_WLAN_SSID), MAIN_WLAN_AUTH,
+	ret = wincStartConnect((char *)MAIN_WLAN_SSID, MAIN_WLAN_AUTH,
 			(char *)MAIN_WLAN_PSK, 1);
-	//ret = m2m_wifi_default_connect();
 #elif (defined USE_APMODE)
-	tstrM2MAPConfig apConfig;
-	strcpy(apConfig.au8SSID, "WINC1500_AP"); // Set SSID
-	apConfig.u8SsidHide = SSID_MODE_VISIBLE; // Set SSID to be broadcasted
-	apConfig.u8ListenChannel = 1; // Set Channel
-	apConfig.u8SecType = MAIN_WLAN_AUTH; // Set Security to OPEN
-
-	// IP Address
-	apConfig.au8DHCPServerIP[0] = 192;
-	apConfig.au8DHCPServerIP[1] = 168;
-	apConfig.au8DHCPServerIP[2] = 1;
-	apConfig.au8DHCPServerIP[3] = 1;
-
-	tstrM2MIPConfig ipConfig;
-	ipConfig.u32StaticIP = MAIN_WIFI_M2M_SERVER_IP;
-
-	m2m_wifi_set_static_ip(&ipConfig);
-
-	// Start AP mode
-	ret = m2m_wifi_enable_ap(&apConfig);
+	ret = wincStartAP((char *)MAIN_WLAN_SSID, MAIN_WLAN_AUTH,
+			(char *)MAIN_WLAN_PSK, 1);
 #endif
-
 	if (ret != M2M_SUCCESS)
 	{
 		debug("WINC1500 Wifi failed to connect\r\n");
@@ -862,8 +254,9 @@ int main(void)
 	// Wait for connection
 	nm_bsp_sleep(10000);
 #endif
-
-	//HAL_UART_Receive_IT(&huart3, uart3RxBuffer, UART_BUFFER_SIZE);
+#if GPS_ON
+	HAL_UART_Receive_IT(&huart3, GpsRxBuffer, UART_BUFFER_SIZE);
+#endif
 	/* USER CODE END 2 */
 
 	/* Infinite loop */
@@ -921,14 +314,15 @@ int main(void)
 
 		//debug("UDP Sent\r\n");
 
-		HAL_CAN_AddTxMessage(&hcan1, &TxHeader, TxData, &TxMailbox);
+		// Send motor CAN request
+		motorRequestFrames(MOTOR_CAN_REQ_FRAME_0 | MOTOR_CAN_REQ_FRAME_1 | MOTOR_CAN_REQ_FRAME_2);
 
 		//nm_bsp_sleep(1000);
 #endif
 		if (uart3RxITFlag == 1)
 		{
 			uart3RxITFlag = 0;
-			debug("%s", uart3RxBuffer);
+			debug("%s", GpsRxBuffer);
 		}
 		/* USER CODE END WHILE */
 
@@ -1307,7 +701,15 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 	if (huart == &huart3)
 	{
 		uart3RxITFlag = 1;
-		HAL_UART_Receive_IT(&huart3, uart3RxBuffer, UART_BUFFER_SIZE);
+		HAL_UART_Receive_IT(&huart3, GpsRxBuffer, UART_BUFFER_SIZE);
+	}
+}
+
+void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
+{
+	if(GPIO_Pin==GPIO_PIN_9)
+	{
+		isr();
 	}
 }
 

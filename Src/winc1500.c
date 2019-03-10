@@ -25,94 +25,100 @@
 #include "driver/m2m_ssl.h"
 #include "driver/m2m_wifi.h"
 
+static SOCKET udp_socket = -1;
+
 static void wifi_cb(uint8_t u8MsgType, void *pvMsg)
 {
-//	switch (u8MsgType) {
-//	case M2M_WIFI_RESP_SCAN_DONE:
-//	{
-//		tstrM2mScanDone *pstrInfo = (tstrM2mScanDone *)pvMsg;
-//		scan_request_index = 0;
-//		if (pstrInfo->u8NumofCh >= 1) {
-//			m2m_wifi_req_scan_result(scan_request_index);
-//			scan_request_index++;
-//		} else {
-//			m2m_wifi_request_scan(M2M_WIFI_CH_ALL);
-//		}
-//
-//		break;
-//	}
-//
-//	case M2M_WIFI_RESP_SCAN_RESULT:
-//	{
-//		tstrM2mWifiscanResult *pstrScanResult = (tstrM2mWifiscanResult *)pvMsg;
-//		uint16_t demo_ssid_len;
-//		uint16_t scan_ssid_len = strlen((const char *)pstrScanResult->au8SSID);
-//
-//		/* display founded AP. */
-//		printf("[%d] SSID:%s\r\n", scan_request_index, pstrScanResult->au8SSID);
-//
-//		num_founded_ap = m2m_wifi_get_num_ap_found();
-//		if (scan_ssid_len) {
-//			/* check same SSID. */
-//			demo_ssid_len = strlen((const char *)MAIN_WLAN_SSID);
-//			if
-//			(
-//					(demo_ssid_len == scan_ssid_len) &&
-//					(!memcmp(pstrScanResult->au8SSID, (uint8_t *)MAIN_WLAN_SSID, demo_ssid_len))
-//			) {
-//				/* A scan result matches an entry in the preferred AP List.
-//				 * Initiate a connection request.
-//				 */
-//				printf("Found %s \r\n", MAIN_WLAN_SSID);
-//				m2m_wifi_connect((char *)MAIN_WLAN_SSID,
-//						sizeof(MAIN_WLAN_SSID),
-//						MAIN_WLAN_AUTH,
-//						(void *)MAIN_WLAN_PSK,
-//						M2M_WIFI_CH_ALL);
-//				break;
-//			}
-//		}
-//
-//		if (scan_request_index < num_founded_ap) {
-//			m2m_wifi_req_scan_result(scan_request_index);
-//			scan_request_index++;
-//		} else {
-//			printf("can not find AP %s\r\n", MAIN_WLAN_SSID);
-//			m2m_wifi_request_scan(M2M_WIFI_CH_ALL);
-//		}
-//
-//		break;
-//	}
-//
-//	case M2M_WIFI_RESP_CON_STATE_CHANGED:
-//	{
-//		tstrM2mWifiStateChanged *pstrWifiState = (tstrM2mWifiStateChanged *)pvMsg;
-//		if (pstrWifiState->u8CurrState == M2M_WIFI_CONNECTED) {
-//			m2m_wifi_request_dhcp_client();
-//		} else if (pstrWifiState->u8CurrState == M2M_WIFI_DISCONNECTED) {
-//			printf("Wi-Fi disconnected\r\n");
-//
-//			/* Request scan. */
-//			m2m_wifi_request_scan(M2M_WIFI_CH_ALL);
-//		}
-//
-//		break;
-//	}
-//
-//	case M2M_WIFI_REQ_DHCP_CONF:
-//	{
-//		uint8_t *pu8IPAddress = (uint8_t *)pvMsg;
-//		printf("Wi-Fi connected\r\n");
-//		printf("Wi-Fi IP is %u.%u.%u.%u\r\n",
-//				pu8IPAddress[0], pu8IPAddress[1], pu8IPAddress[2], pu8IPAddress[3]);
-//		break;
-//	}
-//
-//	default:
-//	{
-//		break;
-//	}
-//	}
+	switch (u8MsgType) {
+	case M2M_WIFI_RESP_CON_STATE_CHANGED:
+	{
+		//debug("State: M2M_WIFI_RESP_CON_STATE_CHANGED\r\n");
+		tstrM2mWifiStateChanged *pstrWifiState = (tstrM2mWifiStateChanged *)pvMsg;
+		if (pstrWifiState->u8CurrState == M2M_WIFI_CONNECTED) {
+			debug("\033[H");
+			debug("\033[5B");
+			debug("Wi-Fi Status: Connected\r\n");
+			m2m_wifi_enable_dhcp(0);
+#if (defined USE_STATIONMODE)
+			tstrM2MIPConfig stnConfig;
+			stnConfig.u32StaticIP = _htonl(MAIN_WIFI_M2M_CLIENT_IP_ALT);
+			stnConfig.u32SubnetMask = _htonl(0xFFFFFF00); //corresponds to 255.255.255.0
+			m2m_wifi_set_static_ip(&stnConfig);
+#endif
+		} else if (pstrWifiState->u8CurrState == M2M_WIFI_DISCONNECTED) {
+			debug("\033[H");
+			debug("\033[5B");
+			debug("Wi-Fi Status: Disconnected\r\n");
+#if (defined USE_STATIONMODE)
+			/* Reconnect. */
+			m2m_wifi_connect((char *)MAIN_WLAN_SSID, sizeof(MAIN_WLAN_SSID), MAIN_WLAN_AUTH,
+					(char *)MAIN_WLAN_PSK, 1);
+#endif
+		}
+		break;
+	}
+
+	case M2M_WIFI_REQ_DHCP_CONF:
+	{
+		//debug("State: M2M_WIFI_REQ_DHCP_CONF\r\n");
+		uint8_t *pu8IPAddress = (uint8_t *)pvMsg;
+		debug("\033[H");
+		debug("\033[4B");
+		debug("Wi-Fi configured\r\n");
+#if (defined USE_APMODE)
+		debug("Client IP is %d.%d.%d.%d\r\n", pu8IPAddress[0], pu8IPAddress[1], pu8IPAddress[2], pu8IPAddress[3]);
+#elif (defined USE_STATIONMODE)
+		// Get the current AP info
+		//m2m_wifi_get_connection_info();
+		m2m_wifi_req_curr_rssi();
+#endif
+		// Initialize socket
+#if (defined USE_CLIENT)
+		udpClientStart((char*)MAIN_WIFI_M2M_SERVER_IP, MAIN_WIFI_M2M_SERVER_PORT);
+#elif (defined USE_SERVER)
+		udpStartServer(MAIN_WIFI_M2M_SERVER_PORT);
+#endif
+		break;
+	}
+
+	/*case M2M_WIFI_RESP_IP_CONFIGURED:
+	{
+		debug("State: M2M_WIFI_RESP_IP_CONFIGURED\r\n");
+		uint8_t *pu8IPAddress = (uint8_t *)pvMsg;
+		debug("Wi-Fi RESP IP configured\r\n");
+		debug("Wi-Fi Static IP is %d.%d.%d.%d\r\n", pu8IPAddress[0], pu8IPAddress[1], pu8IPAddress[2], pu8IPAddress[3]);
+		break;
+	}*/
+
+	case M2M_WIFI_RESP_CURRENT_RSSI:
+	{
+		sint8 *rssi = (sint8*)pvMsg;
+		global_rssi = *rssi;
+		debug("\033[H");
+		debug("\033[6B");
+		debug("Signal Strength : %d\n", global_rssi);
+		break;
+	}
+
+	case M2M_WIFI_RESP_CONN_INFO:
+	{
+		tstrM2MConnInfo *pstrConnInfo = (tstrM2MConnInfo*)pvMsg;
+
+		debug("CONNECTED AP INFO\n");
+		debug("SSID : %s\n",pstrConnInfo->acSSID);
+		debug("SEC TYPE : %d\n",pstrConnInfo->u8SecType);
+		debug("Signal Strength : %d\n", pstrConnInfo->s8RSSI);
+		debug("Local IP Address : %d.%d.%d.%d\n", pstrConnInfo->au8IPAddr[0] , pstrConnInfo->au8IPAddr[1], pstrConnInfo->au8IPAddr[2], pstrConnInfo->au8IPAddr[3]);
+
+		UART_Send_Cmd(&huart2, ASCII_HOME);
+		break;
+	}
+
+	default:
+	{
+		break;
+	}
+	}
 }
 
 int8_t wincInit(void)
@@ -120,25 +126,24 @@ int8_t wincInit(void)
 	tstrWifiInitParam param;
 	int8_t ret;
 
+	// Init SPI with dummy byte
+	spi_dummy_send();
+
 	// Initialize the WiFi BSP:
 	nm_bsp_init();
 
-	// Initialize WiFi module and register status callback:
+	// Initialize WiFi parameters structure
 	m2m_memset((uint8*)&param, 0, sizeof(param));
 	param.pfAppWifiCb = wifi_cb;
 
-
+	// Initialize WiFi module and register status callback:
 	ret = m2m_wifi_init(&param);
-	if (M2M_SUCCESS != ret && M2M_ERR_FW_VER_MISMATCH != ret) {
-#ifdef CONF_PERIPH
-		if (ret != M2M_ERR_INVALID) {
-			// Error led ON (rev A then rev B).
-			m2m_periph_gpio_set_val(M2M_PERIPH_GPIO18, 0);
-			m2m_periph_gpio_set_dir(M2M_PERIPH_GPIO6, 1);
-		}
-#endif
-		M2M_ERR("Driver Init Failed <%d>\n",ret);
-		return ret;
+	if (M2M_SUCCESS != ret) {
+		debug("WINC1500 Wifi Initialization failed\r\n");
+	}
+	else
+	{
+		debug("WINC1500 Wifi Initialized\r\n");
 	}
 
 	return ret;
@@ -210,41 +215,7 @@ uint8_t wincStartAP(const char *ssid, uint8_t u8SecType, const void *pvAuthInfo,
 		return WL_AP_FAILED;
 	}
 
-#ifdef CONF_PERIPH
-	// WiFi led ON (rev A then rev B).
-	m2m_periph_gpio_set_val(M2M_PERIPH_GPIO15, 0);
-	m2m_periph_gpio_set_val(M2M_PERIPH_GPIO4, 0);
-#endif
-
-	return WL_AP_CONNECTED;
-}
-
-uint8_t wincStartProvision(const char *ssid, const char *url, uint8_t channel)
-{
-	tstrM2MAPConfig strM2MAPConfig;
-
-	// Enter Provision mode:
-	memset(&strM2MAPConfig, 0x00, sizeof(tstrM2MAPConfig));
-	strcpy((char *)&strM2MAPConfig.au8SSID, ssid);
-	strM2MAPConfig.u8ListenChannel = channel;
-	strM2MAPConfig.u8SecType = M2M_WIFI_SEC_OPEN;
-	strM2MAPConfig.u8SsidHide = SSID_MODE_VISIBLE;
-	strM2MAPConfig.au8DHCPServerIP[0] = 192;
-	strM2MAPConfig.au8DHCPServerIP[1] = 168;
-	strM2MAPConfig.au8DHCPServerIP[2] = 1;
-	strM2MAPConfig.au8DHCPServerIP[3] = 1;
-
-	if (m2m_wifi_start_provision_mode((tstrM2MAPConfig *)&strM2MAPConfig, (char*)url, 1) < 0) {
-		return WL_PROVISIONING_FAILED;
-	}
-
-#ifdef CONF_PERIPH
-	// WiFi led ON (rev A then rev B).
-	m2m_periph_gpio_set_val(M2M_PERIPH_GPIO15, 0);
-	m2m_periph_gpio_set_val(M2M_PERIPH_GPIO4, 0);
-#endif
-
-	return WL_PROVISIONING;
+	return M2M_SUCCESS;
 }
 
 void config_ip(uint32_t local_ip, uint32_t dns_server, uint32_t gateway, uint32_t subnet)
@@ -294,4 +265,161 @@ void maxLowPowerMode(void)
 void noLowPowerMode(void)
 {
 	m2m_wifi_set_sleep_mode(M2M_NO_PS, 0);
+}
+
+
+
+void udpClientSocketEventHandler(SOCKET sock, uint8 u8Msg, void * pvMsg)
+{
+	if((u8Msg == SOCKET_MSG_RECV) || (u8Msg == SOCKET_MSG_RECVFROM))
+	{
+		debug("State: SOCKET_MSG_RECV\r\n");
+
+		tstrSocketRecvMsg *pstrRecvMsg = (tstrSocketRecvMsg*)pvMsg;
+		if((pstrRecvMsg->pu8Buffer != NULL) && (pstrRecvMsg->s16BufferSize > 0))
+		{
+			uint16 len;
+
+			// Clear txBuffer
+			memset(txBuffer,0,sizeof(txBuffer));
+
+			// Format a message in the txBuffer and put its length in len
+			txBuffer[0] = 0;
+			txBuffer[1] = 1;
+			txBuffer[2] = 2;
+			len = 3;
+
+			// Handle received data.
+			debug("Message received: %s\r\n", rxBuffer);
+
+			//sendto(udp_socket, txBuffer, len, 0,
+			//	(struct sockaddr*)&strAddr, sizeof(struct sockaddr_in));
+
+			recvfrom(udp_socket, rxBuffer, sizeof(rxBuffer), 0);
+		}
+	}
+	else if (u8Msg == SOCKET_MSG_SENDTO)
+	{
+		//debug("CAN Message sent via WiFi\r\n");
+	}
+}
+
+void udpClientStart(char *pcServerIP, uint16_t port)
+{
+	// Register socket application callbacks.
+	registerSocketCallback(udpClientSocketEventHandler, NULL);
+
+	udp_socket = socket(AF_INET, SOCK_DGRAM, 0);
+	if(udp_socket >= 0)
+	{
+		uint16 len;
+		strAddr.sin_family = AF_INET;
+		strAddr.sin_port = _htons(port);
+		strAddr.sin_addr.s_addr = _htonl(MAIN_WIFI_M2M_SERVER_IP); //nmi_inet_addr(pcServerIP);
+
+		// Format some message in the txBuffer and put its length in len
+		strcpy(txBuffer, "Solar Car Connected");
+		len = strlen(txBuffer);
+
+		sendto(udp_socket, (void *)txBuffer, len, 0, (struct sockaddr*)&strAddr,
+				sizeof(strAddr));
+
+		recvfrom(udp_socket, rxBuffer, sizeof(rxBuffer), 0);
+	}
+	else
+	{
+		debug("Failed to create client socket\r\n");
+	}
+}
+
+static const char *inet_ntop4(const unsigned char *src, char *dst, size_t size)
+{
+	static const char fmt[] = "%u.%u.%u.%u";
+	char tmp[sizeof "255.255.255.255"];
+
+	sprintf(tmp, fmt, src[0], src[1], src[2], src[3]);
+	if (strlen(tmp) > size) {
+		return (NULL);
+	}
+	strcpy(dst, tmp);
+	return (dst);
+}
+
+void udpServerSocketEventHandler(SOCKET sock, uint8 u8Msg, void *pvMsg)
+{
+	if(u8Msg == SOCKET_MSG_BIND)
+	{
+		//debug("State: SOCKET_MSG_BIND\r\n");
+
+		tstrSocketBindMsg *pstrBind = (tstrSocketBindMsg*)pvMsg;
+		if(pstrBind->status == 0)
+		{
+			//debug("Bind Success\r\n");
+
+			// call Recv
+			recvfrom(udp_socket, rxBuffer, sizeof(rxBuffer), 0);
+		}
+		else
+		{
+			//debug("Bind Failed\r\n");
+		}
+	}
+	else if(u8Msg == SOCKET_MSG_RECVFROM)
+	{
+		//debug("State: SOCKET_MSG_RECVFROM\r\n");
+
+		tstrSocketRecvMsg *pstrRecvMsg = (tstrSocketRecvMsg*)pvMsg;
+		if((pstrRecvMsg->pu8Buffer != NULL) && (pstrRecvMsg->s16BufferSize > 0))
+		{
+			char remote_addr[16];
+			inet_ntop4((unsigned char*)&pstrRecvMsg->strRemoteAddr.sin_addr, (char*)&remote_addr, 16);
+
+			// Handle received data.
+			//debug("Message received from %s: %s\r\n", remote_addr, rxBuffer);
+
+			Can_To_UART();
+
+			//HAL_UART_Transmit(&huart2, rxBuffer, strlen(rxBuffer), 100);
+			//UART_Send_Cmd(&huart2, "\r\n");
+
+			// Clear txBuffer
+			memset(txBuffer,0,sizeof(txBuffer));
+
+			// Fill in the txBuffer with some data
+			strcpy((char *)txBuffer, "Ack");
+
+			// Send some data to the same address.
+			sendto(udp_socket, txBuffer, strlen(txBuffer), 0,
+					&pstrRecvMsg->strRemoteAddr, sizeof(pstrRecvMsg->strRemoteAddr));
+
+			// call Recv
+			recvfrom(udp_socket, rxBuffer, sizeof(rxBuffer), 0);
+		}
+	}
+}
+
+void udpStartServer(uint16 u16ServerPort)
+{
+	// Register socket application callbacks.
+	registerSocketCallback(udpServerSocketEventHandler, NULL);
+
+	// Create the server listen socket.
+	udp_socket = socket(AF_INET, SOCK_DGRAM, 0);
+	if(udp_socket >= 0)
+	{
+		strAddr.sin_family = AF_INET;
+		strAddr.sin_port = _htons(u16ServerPort);
+		strAddr.sin_addr.s_addr = 0; //INADDR_ANY
+
+		int ret = bind(udp_socket, (struct sockaddr*)&strAddr, sizeof(struct sockaddr_in));
+
+		if (ret == M2M_SUCCESS)
+		{
+			//debug("WINC1500 Wifi Bind Success\r\n");
+		}
+		else
+		{
+			//debug("WINC1500 Wifi Bind Failed\r\n");
+		}
+	}
 }

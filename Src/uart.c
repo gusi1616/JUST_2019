@@ -27,21 +27,16 @@ void UART_Send_Hex(UART_HandleTypeDef *huart, int16_t intIn)
 }
 void UART_Send_Str(UART_HandleTypeDef *huart, const char *fmt, ...)
 {
-	/*char buffer[500];
+	char buffer[500];
 	va_list args;
 	va_start(args, fmt);
 	vsnprintf(buffer, sizeof(buffer), fmt, args);
 	va_end(args);
-	HAL_UART_Transmit(huart, buffer, strlen(buffer), 100);*/
+	HAL_UART_Transmit(huart, buffer, strlen(buffer), 100);
 }
 void UART_Send_Cmd(UART_HandleTypeDef *huart, char *cmd)
 {
 	HAL_UART_Transmit(huart, cmd, strlen(cmd), 100);
-}
-void UART_Send_IntAndStr(UART_HandleTypeDef *huart, int16_t intIn, char *str)
-{
-	UART_Send_Int(huart, intIn);
-	UART_Send_Str(huart, str);
 }
 void UART_Clear_Terminal(UART_HandleTypeDef *huart)
 {
