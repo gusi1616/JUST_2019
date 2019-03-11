@@ -128,8 +128,8 @@ int main(void)
 	MX_USART3_UART_Init();
 	MX_TIM15_Init();
 	/* USER CODE BEGIN 2 */
-	UART_Send_Cmd(&huart2, ASCII_CLEAR);
-	UART_Send_Cmd(&huart2, ASCII_HOME);
+	debug(ASCII_CLEAR);
+	debug(ASCII_HOME);
 	debug("Device start\r");
 	/* USER CODE END 2 */
 
