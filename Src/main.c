@@ -133,8 +133,7 @@ UART_HandleTypeDef huart3;
 /* USER CODE BEGIN PV */
 /* Private variables ---------------------------------------------------------*/
 
-struct sockaddr_in strAddr;
-struct sockaddr_in broadcastAddr;
+
 
 /** Wi-Fi connection state */
 static volatile uint8_t wifi_connected;

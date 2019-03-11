@@ -26,6 +26,7 @@
 #include "driver/m2m_wifi.h"
 
 static SOCKET udp_socket = -1;
+struct sockaddr_in strAddr;
 
 static void wifi_cb(uint8_t u8MsgType, void *pvMsg)
 {
