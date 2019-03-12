@@ -8,6 +8,6 @@
 #ifndef TMP117_H_
 #define TMP117_H_
 
-
+void tempSensorInit(void);
 
 #endif /* TMP117_H_ */

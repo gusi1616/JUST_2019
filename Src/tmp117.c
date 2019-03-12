@@ -6,5 +6,9 @@
  */
 
 #include "tmp117.h"
+#include "i2c.h"
 
+void tempSensorInit(void)
+{
 
+}
