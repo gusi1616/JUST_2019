@@ -8,6 +8,11 @@
 #ifndef TMP117_H_
 #define TMP117_H_
 
+#include "sol_common.h"
+
+/** Device ID **/
+#define TMP117_DEV_ID 0x0117
+
 /** Device address **/
 #define TMP117_DEV_READ_ADDR 		0b10010001u
 #define TMP117_DEV_WRITE_ADDR 		0b10010000u
@@ -25,9 +30,9 @@
 #define TMP117_DEV_ID_REG 			0x0F
 
 /** Function prototypes **/
-void tempSensor_Init(void);
-void tempSensor_Write(uint8_t *pData, uint16_t size);
-void tempSensor_Read(uint8_t *pData, uint16_t size);
+int8_t tempSensor_Init(void);
+void tempSensor_Write(uint8_t reg, uint8_t *pData, uint16_t size);
+void tempSensor_Read(uint8_t reg, uint8_t *pData, uint16_t size);
 uint16_t tempSensor_GetDevID(void);
 float tempSensor_GetTemp(void);
 void tempSensor_SoftReset(void);
