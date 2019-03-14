@@ -94,15 +94,6 @@ void Error_Handler(void);
 #define GPS_ODOMETER_GPIO_Port GPIOB
 #define GPS_RSTN_Pin GPIO_PIN_15
 #define GPS_RSTN_GPIO_Port GPIOB
-#define WINC_CS_Pin GPIO_PIN_6
-#define WINC_CS_GPIO_Port GPIOC
-#define WINC_EN_Pin GPIO_PIN_7
-#define WINC_EN_GPIO_Port GPIOC
-#define WINC_RST_Pin GPIO_PIN_8
-#define WINC_RST_GPIO_Port GPIOC
-#define WINC_IRQ_Pin GPIO_PIN_9
-#define WINC_IRQ_GPIO_Port GPIOC
-#define WINC_IRQ_EXTI_IRQn EXTI9_5_IRQn
 #define TMS_Pin GPIO_PIN_13
 #define TMS_GPIO_Port GPIOA
 #define TCK_Pin GPIO_PIN_14

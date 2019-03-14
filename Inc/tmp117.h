@@ -9,5 +9,7 @@
 #define TMP117_H_
 
 void tempSensorInit(void);
+void tempSensorWrite();
+void tempSensorRead();
 
 #endif /* TMP117_H_ */

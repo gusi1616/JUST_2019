@@ -12,3 +12,13 @@ void tempSensorInit(void)
 {
 
 }
+
+void tempSensorWrite()
+{
+
+}
+
+void tempSensorRead()
+{
+
+}
