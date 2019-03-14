@@ -34,7 +34,7 @@ uint16_t tempSensor_GetDevID(void)
 	return devID = (buffer[1] << 8u) | buffer[0];
 }
 
-float tempSensor_GetTemp(void)
+float tempSensor_GetTemp(void) // TODO: Set interrupt on ALERT Pin and read on interrupt
 {
 	uint8_t buffer[2] = 0;
 	uint16_t rawTemp = 0;
