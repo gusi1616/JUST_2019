@@ -14,6 +14,7 @@
 #define SOL_OK 		0
 
 #define HI2C_TEMP hi2c1
+#define HI2C_ACC hi2c1
 
 extern I2C_HandleTypeDef hi2c1;
 
