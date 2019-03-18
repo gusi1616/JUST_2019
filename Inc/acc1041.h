@@ -39,10 +39,16 @@
 #define ACC1041_SELF_TEST_REG 			0x3A
 #define ACC1041_WAKEUP_THRESHOLD_REG 	0x6A
 
+#define ACC1041_CONVERSION_12BIT_8G 	0.00390625
+
 /** Function prototypes **/
 int8_t accelerometer_Init(void);
 int8_t accelerometer_Write(uint8_t reg, uint8_t *pData, uint16_t size);
 int8_t accelerometer_Read(uint8_t reg, uint8_t *pData, uint16_t size);
 uint16_t accelerometer_GetDevID(void);
+int16_t accelerometer_ReadX(void);
+int16_t accelerometer_ReadY(void);
+int16_t accelerometer_ReadZ(void);
+uint16_t accelerometer_ProcessData(void);
 
 #endif /* ACC1041_H_ */
